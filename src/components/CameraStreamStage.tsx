@@ -1,9 +1,10 @@
-import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { useCameraApi } from "../hooks/useCameraApi";
+import { ensureWebRtcGlobals, WebRtcVideoSurface } from "../webrtc/runtime";
 
 export type CameraStreamMode = "webrtc" | "mjpeg" | "snapshot";
 
@@ -60,7 +61,6 @@ export default function CameraStreamStage({
   const [mjpegTick, setMjpegTick] = useState(0);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
-  const webVideoRef = useRef<HTMLVideoElement | null>(null);
 
   const mjpegUrl = useMemo(() => {
     const base = getMjpegStreamUrl(entityId);
@@ -93,13 +93,6 @@ export default function CameraStreamStage({
     }
   }, [entityId, fetchSnapshotDataUri]);
 
-  // Attach MediaStream to web <video> element when available
-  useEffect(() => {
-    if (Platform.OS === "web" && webVideoRef.current) {
-      webVideoRef.current.srcObject = webrtcStream;
-    }
-  }, [webrtcStream]);
-
   // WebRTC WHEP negotiation when mode === "webrtc" and active === true
   useEffect(() => {
     if (!active || mode !== "webrtc" || !entityId.trim()) {
@@ -109,19 +102,14 @@ export default function CameraStreamStage({
       return;
     }
 
-    const PeerConn =
-      typeof globalThis.RTCPeerConnection === "function"
-        ? globalThis.RTCPeerConnection
-        : undefined;
-
-    if (!PeerConn) {
-      setWebrtcError(
-        "WebRTC (RTCPeerConnection) is not available in Expo Go. Use Expo Web or a custom dev build with react-native-webrtc."
-      );
+    const runtime = ensureWebRtcGlobals();
+    if (!runtime.ok || typeof globalThis.RTCPeerConnection !== "function") {
+      setWebrtcError(runtime.error ?? "WebRTC runtime unavailable.");
       onStatusText?.("WebRTC Unavailable");
       return;
     }
 
+    const PeerConn = globalThis.RTCPeerConnection;
     let cancelled = false;
     setWebrtcConnecting(true);
     setWebrtcError(null);
@@ -173,7 +161,12 @@ export default function CameraStreamStage({
           return;
         }
 
-        await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
+        const answerDesc =
+          typeof globalThis.RTCSessionDescription === "function"
+            ? new globalThis.RTCSessionDescription({ type: "answer", sdp: answerSdp })
+            : { type: "answer" as const, sdp: answerSdp };
+
+        await pc.setRemoteDescription(answerDesc);
         setWebrtcConnecting(false);
         onStatusText?.("WebRTC WHEP Live");
       } catch (err) {
@@ -227,20 +220,7 @@ export default function CameraStreamStage({
     <View className="overflow-hidden rounded-xl bg-black">
       {mode === "webrtc" ? (
         <View className="aspect-video w-full items-center justify-center bg-black">
-          {Platform.OS === "web" &&
-            createElement("video", {
-              ref: webVideoRef,
-              autoPlay: true,
-              playsInline: true,
-              muted: true,
-              controls: true,
-              style: {
-                width: "100%",
-                height: "100%",
-                objectFit: "contain",
-                backgroundColor: "#000",
-              },
-            })}
+          <WebRtcVideoSurface stream={webrtcStream} />
           {webrtcConnecting && (
             <View className="absolute inset-0 items-center justify-center bg-black/75">
               <ActivityIndicator color={colors.accentWarm} />
