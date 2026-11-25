@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../context/ThemeContext";
 import type { ToastState } from "../hooks/useToast";
 
 interface Props {
@@ -8,27 +9,51 @@ interface Props {
 }
 
 export default function ToastBanner({ toast, onDismiss }: Props) {
+  const { colors } = useTheme();
   if (!toast) return null;
 
   const palette =
     toast.kind === "error"
-      ? { bg: "bg-red-950 border-red-400/60", text: "text-red-200", icon: "alert-circle" as const, iconColor: "#fca5a5" }
+      ? {
+          bg: colors.crimsonBg,
+          border: colors.crimsonBorder,
+          text: colors.crimson,
+          icon: "alert-circle-outline" as const,
+        }
       : toast.kind === "success"
-      ? { bg: "bg-emerald-950 border-emerald-400/60", text: "text-emerald-200", icon: "checkmark-circle" as const, iconColor: "#6ee7b7" }
-      : { bg: "bg-blue-900 border-blue-400/60", text: "text-blue-100", icon: "notifications" as const, iconColor: "#93c5fd" };
+      ? {
+          bg: colors.emeraldBg,
+          border: colors.emeraldBorder,
+          text: colors.emerald,
+          icon: "checkmark-circle-outline" as const,
+        }
+      : {
+          bg: colors.elevated,
+          border: colors.hairlineStrong,
+          text: colors.ink,
+          icon: "information-circle-outline" as const,
+        };
 
   return (
     <Pressable
       onPress={onDismiss}
-      className={`mx-4 mt-3 flex-row items-center rounded-2xl border px-4 py-3 ${palette.bg}`}
+      style={{
+        backgroundColor: palette.bg,
+        borderColor: palette.border,
+        borderWidth: 1,
+      }}
+      className="mx-4 mt-3 flex-row items-center rounded-2xl px-4 py-3"
     >
-      <Ionicons name={palette.icon} size={20} color={palette.iconColor} />
-      <Text className={`ml-2.5 flex-1 text-sm font-medium ${palette.text}`}>
+      <Ionicons name={palette.icon} size={18} color={palette.text} />
+      <Text
+        style={{ color: palette.text }}
+        className="ml-2.5 flex-1 text-xs font-medium leading-4"
+      >
         {toast.message}
       </Text>
       {onDismiss && (
-        <View className="ml-2">
-          <Ionicons name="close" size={16} color={palette.iconColor} />
+        <View className="ml-2 opacity-70">
+          <Ionicons name="close" size={15} color={palette.text} />
         </View>
       )}
     </Pressable>

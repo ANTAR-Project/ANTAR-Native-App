@@ -1,8 +1,10 @@
 import { Redirect, Stack, type Href } from "expo-router";
 import { useAuth } from "../../src/context/AuthContext";
+import { useTheme } from "../../src/context/ThemeContext";
 
 export default function OwnerLayout() {
   const { session, booting } = useAuth();
+  const { colors } = useTheme();
 
   if (booting) return null;
   if (!session) return <Redirect href="/" />;
@@ -11,10 +13,11 @@ export default function OwnerLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: "#172554" },
-        headerTintColor: "#bfdbfe",
-        headerTitleStyle: { fontWeight: "700" },
-        contentStyle: { backgroundColor: "#172554" },
+        headerShadowVisible: false,
+        headerStyle: { backgroundColor: colors.bg },
+        headerTintColor: colors.ink,
+        headerTitleStyle: { fontWeight: "600", fontSize: 16 },
+        contentStyle: { backgroundColor: colors.bg },
       }}
     >
       <Stack.Screen name="index" options={{ title: "Owner Console" }} />

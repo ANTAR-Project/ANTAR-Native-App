@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
+import { useTheme } from "../../src/context/ThemeContext";
 import { useElementsApi } from "../../src/hooks/useElementsApi";
 import type { ElementReadResponse } from "../../src/types";
 
 export default function ElementDetailPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const elementId = String(id ?? "");
+  const { colors } = useTheme();
   const { readElement } = useElementsApi();
 
   const [loading, setLoading] = useState(true);
@@ -32,38 +34,60 @@ export default function ElementDetailPage() {
   }, [elementId]);
 
   return (
-    <View className="flex-1 bg-blue-950 p-4">
+    <View style={{ backgroundColor: colors.bg }} className="flex-1 p-4">
       <Stack.Screen
         options={{
           headerShown: true,
           title: elementId || "Element",
-          headerStyle: { backgroundColor: "#172554" },
-          headerTintColor: "#bfdbfe",
-          headerTitleStyle: { fontWeight: "700" },
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: colors.bg },
+          headerTintColor: colors.ink,
+          headerTitleStyle: { fontWeight: "600", fontSize: 16 },
         }}
       />
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#bfdbfe" />
+          <ActivityIndicator size="small" color={colors.accent} />
         </View>
       ) : error ? (
-        <View className="rounded-2xl border border-red-400/50 bg-red-950/50 p-4">
-          <Text className="text-sm text-red-200">{error}</Text>
+        <View
+          style={{
+            backgroundColor: colors.crimsonBg,
+            borderColor: colors.crimsonBorder,
+            borderWidth: 1,
+          }}
+          className="rounded-2xl p-4"
+        >
+          <Text style={{ color: colors.crimson }} className="text-xs leading-5">
+            {error}
+          </Text>
           <Pressable
             onPress={() => void load()}
-            className="mt-4 self-start rounded-xl bg-blue-200 px-4 py-2"
+            style={{ backgroundColor: colors.accent }}
+            className="mt-4 self-start rounded-xl px-4 py-2"
           >
-            <Text className="text-xs font-bold text-blue-950">Retry</Text>
+            <Text style={{ color: colors.accentInk }} className="text-xs font-bold">
+              Retry
+            </Text>
           </Pressable>
         </View>
       ) : (
-        <View className="rounded-2xl border border-blue-800 bg-blue-900/60 p-4">
-          <Text className="text-base font-bold text-blue-100">{data?.elementId}</Text>
-          <Text className="mt-1 text-xs text-blue-300">
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderColor: colors.hairline,
+            borderWidth: 1,
+          }}
+          className="rounded-2xl p-4"
+        >
+          <Text style={{ color: colors.ink }} className="font-mono text-base font-semibold">
+            {data?.elementId}
+          </Text>
+          <Text style={{ color: colors.inkMuted }} className="mt-1 text-xs">
             Type: {data?.type} · Qualifier: {data?.qualifier}
           </Text>
-          <Text className="mt-1 text-xs text-blue-300">
+          <Text style={{ color: colors.inkSubtle }} className="mt-1 text-xs">
             Requested by: {data?.requestedBy}
           </Text>
         </View>

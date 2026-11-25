@@ -4,6 +4,7 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import ToastBanner from "../../src/components/ToastBanner";
+import { useTheme } from "../../src/context/ThemeContext";
 import { type NasScope, useNasApi } from "../../src/hooks/useNasApi";
 import { useToast } from "../../src/hooks/useToast";
 import { isImageFile, isTextFile } from "../../src/utils";
@@ -14,6 +15,7 @@ export default function FilePreviewScreen() {
   const scope: NasScope = params.scope === "shared" ? "shared" : "own";
   const fileName = filePath.split("/").pop() || "Preview";
 
+  const { colors } = useTheme();
   const { fetchPreviewText, buildPreviewUrl, downloadFileToCache } = useNasApi();
   const { toast, show, hide } = useToast();
 
@@ -85,14 +87,15 @@ export default function FilePreviewScreen() {
   };
 
   return (
-    <View className="flex-1 bg-blue-950">
+    <View style={{ backgroundColor: colors.bg }} className="flex-1">
       <Stack.Screen
         options={{
           headerShown: true,
           title: fileName,
-          headerStyle: { backgroundColor: "#172554" },
-          headerTintColor: "#bfdbfe",
-          headerTitleStyle: { fontWeight: "700" },
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: colors.bg },
+          headerTintColor: colors.ink,
+          headerTitleStyle: { fontWeight: "600", fontSize: 16 },
           headerRight: () => (
             <Pressable
               onPress={() => void handleDownloadAndOpen(false)}
@@ -101,9 +104,9 @@ export default function FilePreviewScreen() {
               className="mr-2"
             >
               {downloading ? (
-                <ActivityIndicator size="small" color="#bfdbfe" />
+                <ActivityIndicator size="small" color={colors.accent} />
               ) : (
-                <Ionicons name="download-outline" size={22} color="#bfdbfe" />
+                <Ionicons name="download-outline" size={20} color={colors.accent} />
               )}
             </Pressable>
           ),
@@ -112,24 +115,41 @@ export default function FilePreviewScreen() {
 
       <ToastBanner toast={toast} onDismiss={hide} />
 
-      <View className="border-b border-blue-900 px-4 py-2">
-        <Text className="text-xs text-blue-300" numberOfLines={1}>
+      <View
+        style={{ borderBottomColor: colors.hairline, borderBottomWidth: 1 }}
+        className="px-4 py-2.5"
+      >
+        <Text
+          style={{ color: colors.inkSubtle }}
+          className="font-mono text-[11px]"
+          numberOfLines={1}
+        >
           {scope === "shared" ? "shared" : "own"} / {filePath}
         </Text>
       </View>
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#bfdbfe" />
-          <Text className="mt-3 text-sm text-blue-300">Loading preview...</Text>
+          <ActivityIndicator size="small" color={colors.accent} />
+          <Text
+            style={{ color: colors.inkSubtle }}
+            className="mt-3 text-xs uppercase tracking-wider"
+          >
+            Loading preview
+          </Text>
         </View>
       ) : error ? (
-        <View className="flex-1 items-center justify-center px-6">
-          <Ionicons name="alert-circle-outline" size={48} color="#f87171" />
-          <Text className="mt-3 text-center text-sm text-red-200">{error}</Text>
+        <View className="flex-1 items-center justify-center px-8">
+          <Ionicons name="alert-circle-outline" size={38} color={colors.crimson} />
+          <Text
+            style={{ color: colors.crimson }}
+            className="mt-3 text-center text-xs leading-5"
+          >
+            {error}
+          </Text>
         </View>
       ) : isImg && imageUrl ? (
-        <View className="flex-1 items-center justify-center p-4">
+        <View className="flex-1 items-center justify-center bg-black p-4">
           <Image
             source={{ uri: imageUrl }}
             style={{ width: "100%", height: "100%" }}
@@ -138,27 +158,53 @@ export default function FilePreviewScreen() {
         </View>
       ) : isTxt ? (
         <ScrollView className="flex-1" contentContainerClassName="p-4">
-          <View className="rounded-2xl border border-blue-800 bg-blue-900/60 p-4">
-            <Text selectable className="font-mono text-xs leading-5 text-blue-100">
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderColor: colors.hairline,
+              borderWidth: 1,
+            }}
+            className="rounded-2xl p-4"
+          >
+            <Text selectable style={{ color: colors.ink }} className="font-mono text-xs leading-5">
               {textBody ?? ""}
             </Text>
           </View>
         </ScrollView>
       ) : (
-        <View className="flex-1 items-center justify-center px-6">
-          <Ionicons name="document-text-outline" size={56} color="#93c5fd" />
-          <Text className="mt-4 text-center text-base font-semibold text-blue-100">
+        <View className="flex-1 items-center justify-center px-8">
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderColor: colors.hairlineStrong,
+              borderWidth: 1,
+            }}
+            className="h-14 w-14 items-center justify-center rounded-2xl"
+          >
+            <Ionicons name="document-text-outline" size={26} color={colors.accentWarm} />
+          </View>
+          <Text
+            style={{ color: colors.ink }}
+            className="mt-4 text-center text-base font-semibold"
+          >
             {fileName}
           </Text>
-          <Text className="mt-1 text-center text-xs text-blue-300">
-            Open with your device&apos;s native document viewer (PDF / vector preview).
+          <Text
+            style={{ color: colors.inkMuted }}
+            className="mt-1.5 text-center text-xs leading-5"
+          >
+            Open with your device&apos;s native document viewer for PDF or vector rendering.
           </Text>
           <Pressable
             onPress={() => void handleDownloadAndOpen(true)}
             disabled={downloading}
-            className="mt-6 rounded-2xl bg-blue-200 px-6 py-3.5"
+            style={{ backgroundColor: colors.accent }}
+            className="mt-6 rounded-2xl px-6 py-3.5"
           >
-            <Text className="font-bold text-blue-950">
+            <Text
+              style={{ color: colors.accentInk }}
+              className="text-xs font-bold tracking-wide"
+            >
               {downloading ? "Downloading..." : "Open Native Preview"}
             </Text>
           </Pressable>

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -12,7 +11,9 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ApiError } from "../../src/api/client";
+import KeyboardModal from "../../src/components/KeyboardModal";
 import ToastBanner from "../../src/components/ToastBanner";
+import { useTheme } from "../../src/context/ThemeContext";
 import { useOwnerApi } from "../../src/hooks/useOwnerApi";
 import { useToast } from "../../src/hooks/useToast";
 import { MIN_PASSWORD_LENGTH, USERNAME_REGEX } from "../../src/policies";
@@ -28,6 +29,7 @@ function computeExpiryIso(preset: ExpiryPreset): string | null {
 }
 
 export default function UsersAndWorkspaces() {
+  const { colors } = useTheme();
   const { listUsers, createUser, provisionWorkspace } = useOwnerApi();
   const { toast, show, hide } = useToast();
 
@@ -121,66 +123,111 @@ export default function UsersAndWorkspaces() {
   };
 
   return (
-    <View className="flex-1 bg-blue-950">
+    <View style={{ backgroundColor: colors.bg }} className="flex-1">
       <ScrollView
-        contentContainerClassName="p-4 pb-28"
+        contentContainerClassName="p-4 pb-24"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => void load(true)}
-            tintColor="#bfdbfe"
+            tintColor={colors.accent}
           />
         }
       >
         <ToastBanner toast={toast} onDismiss={hide} />
 
-        <View className="mt-1 flex-row items-center justify-between rounded-2xl border border-blue-800 bg-blue-900/70 p-4">
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderColor: colors.hairline,
+            borderWidth: 1,
+          }}
+          className="mt-1 flex-row items-center justify-between rounded-2xl p-4"
+        >
           <View>
-            <Text className="text-2xl font-bold text-blue-100">{users.length}</Text>
-            <Text className="text-xs text-blue-300">registered accounts in auth-service</Text>
+            <Text style={{ color: colors.ink }} className="text-2xl font-semibold">
+              {users.length}
+            </Text>
+            <Text
+              style={{ color: colors.inkSubtle }}
+              className="mt-0.5 text-[11px] uppercase tracking-wider"
+            >
+              Registered Accounts
+            </Text>
           </View>
           <Pressable
             onPress={() => {
               setFormError(null);
               setCreateOpen(true);
             }}
-            className="flex-row items-center rounded-xl bg-blue-200 px-3.5 py-2.5"
+            style={{ backgroundColor: colors.accent }}
+            className="flex-row items-center rounded-xl px-4 py-2.5"
           >
-            <Ionicons name="person-add-outline" size={16} color="#172554" />
-            <Text className="ml-1.5 text-xs font-bold text-blue-950">New User</Text>
+            <Ionicons name="person-add-outline" size={15} color={colors.accentInk} />
+            <Text
+              style={{ color: colors.accentInk }}
+              className="ml-1.5 text-xs font-bold"
+            >
+              New User
+            </Text>
           </Pressable>
         </View>
 
         {loading ? (
           <View className="items-center pt-16">
-            <ActivityIndicator size="large" color="#bfdbfe" />
+            <ActivityIndicator size="small" color={colors.accent} />
           </View>
         ) : (
           <View className="mt-5 gap-2.5">
             {users.map((u) => (
               <View
                 key={u.id}
-                className="rounded-2xl border border-blue-800 bg-blue-900/70 p-4"
+                style={{
+                  backgroundColor: colors.surface,
+                  borderColor: colors.hairline,
+                  borderWidth: 1,
+                }}
+                className="rounded-2xl p-4"
               >
                 <View className="flex-row items-center">
-                  <View className="h-11 w-11 items-center justify-center rounded-full bg-blue-950">
-                    <Text className="text-base font-bold uppercase text-blue-200">
+                  <View
+                    style={{
+                      backgroundColor: colors.recessed,
+                      borderColor: colors.hairlineStrong,
+                      borderWidth: 1,
+                    }}
+                    className="h-10 w-10 items-center justify-center rounded-full"
+                  >
+                    <Text
+                      style={{ color: colors.accentWarm }}
+                      className="text-sm font-bold uppercase"
+                    >
                       {u.username[0]}
                     </Text>
                   </View>
 
                   <View className="ml-3 flex-1">
                     <View className="flex-row items-center gap-2">
-                      <Text className="text-base font-semibold text-blue-100">
+                      <Text style={{ color: colors.ink }} className="text-sm font-semibold">
                         {u.username}
                       </Text>
-                      <View className="rounded-full bg-blue-950 px-2 py-0.5">
-                        <Text className="text-[10px] font-bold text-blue-200">
+                      <View
+                        style={{
+                          backgroundColor: colors.recessed,
+                          borderColor: colors.hairlineStrong,
+                          borderWidth: 1,
+                        }}
+                        className="rounded-full px-2 py-0.5"
+                      >
+                        <Text
+                          style={{ color: colors.accentWarm }}
+                          className="text-[10px] font-semibold tracking-wider"
+                        >
                           {u.role}
                         </Text>
                       </View>
                     </View>
-                    <Text className="mt-0.5 text-xs text-blue-300">
+                    <Text style={{ color: colors.inkMuted }} className="mt-0.5 text-[11px]">
                       {u.status} · Joined {formatDate(u.createdAt)}
                       {u.expiresAt ? ` · Expires ${formatDate(u.expiresAt)}` : ""}
                     </Text>
@@ -190,12 +237,20 @@ export default function UsersAndWorkspaces() {
                     <Pressable
                       disabled={provisioningUser === u.username}
                       onPress={() => void handleProvision(u.username)}
-                      className="rounded-xl bg-blue-200 px-3 py-2"
+                      style={{
+                        backgroundColor: colors.elevated,
+                        borderColor: colors.hairlineStrong,
+                        borderWidth: 1,
+                      }}
+                      className="rounded-xl px-3 py-2"
                     >
                       {provisioningUser === u.username ? (
-                        <ActivityIndicator size="small" color="#172554" />
+                        <ActivityIndicator size="small" color={colors.accent} />
                       ) : (
-                        <Text className="text-xs font-bold text-blue-950">
+                        <Text
+                          style={{ color: colors.ink }}
+                          className="text-[11px] font-semibold"
+                        >
                           Provision NAS
                         </Text>
                       )}
@@ -209,128 +264,159 @@ export default function UsersAndWorkspaces() {
       </ScrollView>
 
       {/* Create User Modal */}
-      <Modal
+      <KeyboardModal
         visible={createOpen}
-        transparent
-        animationType="slide"
+        variant="sheet"
         onRequestClose={() => setCreateOpen(false)}
       >
-        <View className="flex-1 justify-end bg-black/70">
-          <View className="rounded-t-3xl border-t border-blue-700 bg-blue-900 p-6">
-            <Text className="text-lg font-bold text-blue-100">
-              Create Resident or Guest
-            </Text>
-            <Text className="mt-1 text-xs text-blue-300">
-              Enforced by auth-service: lowercase username (3-32 chars), password ≥ 8,
-              OWNER role forbidden via API.
-            </Text>
+        <Text style={{ color: colors.ink }} className="text-base font-semibold">
+          Create Resident or Guest
+        </Text>
+        <Text style={{ color: colors.inkMuted }} className="mt-1 text-xs leading-4">
+          Enforced by auth-service: lowercase username (3-32 chars), password ≥ 8,
+          OWNER role forbidden via API.
+        </Text>
 
-            <View className="mt-4 flex-row gap-2">
-              {(["RESIDENT", "GUEST"] as const).map((r) => (
-                <Pressable
-                  key={r}
-                  onPress={() => setRole(r)}
-                  className={`flex-1 items-center rounded-xl py-2.5 ${
-                    role === r ? "bg-blue-200" : "bg-blue-950"
-                  }`}
-                >
-                  <Text
-                    className={`text-xs font-bold ${
-                      role === r ? "text-blue-950" : "text-blue-200"
-                    }`}
-                  >
-                    {r}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <TextInput
-              value={username}
-              onChangeText={setUsername}
-              placeholder="Username (lowercase, digits, _, -)"
-              placeholderTextColor="#6b8bd6"
-              autoCapitalize="none"
-              autoCorrect={false}
-              className="mt-3 rounded-xl bg-blue-950 px-4 py-3 text-sm text-blue-100"
-            />
-
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password (min 8 characters)"
-              placeholderTextColor="#6b8bd6"
-              secureTextEntry
-              autoCapitalize="none"
-              className="mt-3 rounded-xl bg-blue-950 px-4 py-3 text-sm text-blue-100"
-            />
-
-            <Text className="mb-1.5 mt-4 text-xs font-semibold uppercase tracking-wider text-blue-400">
-              Account Expiry (optional)
-            </Text>
-            <View className="flex-row gap-2">
-              {(
-                [
-                  { k: "none", label: "Never" },
-                  { k: "24h", label: "24h" },
-                  { k: "7d", label: "7 days" },
-                  { k: "30d", label: "30 days" },
-                ] as { k: ExpiryPreset; label: string }[]
-              ).map((p) => (
-                <Pressable
-                  key={p.k}
-                  onPress={() => setExpiryPreset(p.k)}
-                  className={`flex-1 items-center rounded-lg py-2 ${
-                    expiryPreset === p.k ? "bg-blue-200" : "bg-blue-950"
-                  }`}
-                >
-                  <Text
-                    className={`text-xs font-semibold ${
-                      expiryPreset === p.k ? "text-blue-950" : "text-blue-300"
-                    }`}
-                  >
-                    {p.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <View className="mt-4 flex-row items-center justify-between">
-              <Text className="text-xs text-blue-200">Require password change</Text>
-              <Switch
-                value={mustChangePwd}
-                onValueChange={setMustChangePwd}
-                trackColor={{ false: "#172554", true: "#60a5fa" }}
-                thumbColor="#e0f2fe"
-              />
-            </View>
-
-            {formError && (
-              <Text className="mt-3 text-xs text-red-300">{formError}</Text>
-            )}
-
-            <View className="mt-5 flex-row gap-3">
-              <Pressable
-                onPress={() => setCreateOpen(false)}
-                className="flex-1 items-center rounded-xl border border-blue-700 py-3.5"
+        <View
+          style={{
+            backgroundColor: colors.recessed,
+            borderColor: colors.hairline,
+            borderWidth: 1,
+          }}
+          className="mt-4 flex-row rounded-xl p-1"
+        >
+          {(["RESIDENT", "GUEST"] as const).map((r) => (
+            <Pressable
+              key={r}
+              onPress={() => setRole(r)}
+              style={{
+                backgroundColor: role === r ? colors.accent : "transparent",
+              }}
+              className="flex-1 items-center rounded-lg py-2.5"
+            >
+              <Text
+                style={{ color: role === r ? colors.accentInk : colors.inkMuted }}
+                className="text-xs font-bold tracking-wide"
               >
-                <Text className="font-semibold text-blue-200">Cancel</Text>
-              </Pressable>
-              <Pressable
-                disabled={creating}
-                onPress={() => void handleCreateUser()}
-                className="flex-1 items-center rounded-xl bg-blue-200 py-3.5"
-              >
-                {creating ? (
-                  <ActivityIndicator color="#172554" />
-                ) : (
-                  <Text className="font-bold text-blue-950">Create User</Text>
-                )}
-              </Pressable>
-            </View>
-          </View>
+                {r}
+              </Text>
+            </Pressable>
+          ))}
         </View>
-      </Modal>
+
+        <TextInput
+          value={username}
+          onChangeText={setUsername}
+          placeholder="Username (lowercase, digits, _, -)"
+          placeholderTextColor={colors.inkSubtle}
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={{
+            backgroundColor: colors.recessed,
+            borderColor: colors.hairlineStrong,
+            borderWidth: 1,
+            color: colors.ink,
+          }}
+          className="mt-3 rounded-xl px-4 py-3 text-sm"
+        />
+
+        <TextInput
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Password (min 8 characters)"
+          placeholderTextColor={colors.inkSubtle}
+          secureTextEntry
+          autoCapitalize="none"
+          style={{
+            backgroundColor: colors.recessed,
+            borderColor: colors.hairlineStrong,
+            borderWidth: 1,
+            color: colors.ink,
+          }}
+          className="mt-3 rounded-xl px-4 py-3 text-sm"
+        />
+
+        <Text
+          style={{ color: colors.inkSubtle }}
+          className="mb-1.5 mt-4 text-[11px] font-semibold uppercase tracking-[0.14em]"
+        >
+          Account Expiry (optional)
+        </Text>
+        <View className="flex-row gap-2">
+          {(
+            [
+              { k: "none", label: "Never" },
+              { k: "24h", label: "24h" },
+              { k: "7d", label: "7 days" },
+              { k: "30d", label: "30 days" },
+            ] as { k: ExpiryPreset; label: string }[]
+          ).map((p) => (
+            <Pressable
+              key={p.k}
+              onPress={() => setExpiryPreset(p.k)}
+              style={{
+                backgroundColor: expiryPreset === p.k ? colors.elevated : colors.recessed,
+                borderColor: expiryPreset === p.k ? colors.accent : colors.hairline,
+                borderWidth: 1,
+              }}
+              className="flex-1 items-center rounded-lg py-2"
+            >
+              <Text
+                style={{
+                  color: expiryPreset === p.k ? colors.accent : colors.inkMuted,
+                }}
+                className="text-xs font-semibold"
+              >
+                {p.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <View className="mt-4 flex-row items-center justify-between">
+          <Text style={{ color: colors.inkMuted }} className="text-xs">
+            Require password change on first login
+          </Text>
+          <Switch
+            value={mustChangePwd}
+            onValueChange={setMustChangePwd}
+            trackColor={{ false: colors.hairlineStrong, true: colors.accent }}
+            thumbColor={colors.elevated}
+          />
+        </View>
+
+        {formError && (
+          <Text style={{ color: colors.crimson }} className="mt-3 text-xs">
+            {formError}
+          </Text>
+        )}
+
+        <View className="mt-5 flex-row gap-3">
+          <Pressable
+            onPress={() => setCreateOpen(false)}
+            style={{ borderColor: colors.hairlineStrong, borderWidth: 1 }}
+            className="flex-1 items-center rounded-xl py-3.5"
+          >
+            <Text style={{ color: colors.inkMuted }} className="text-xs font-semibold">
+              Cancel
+            </Text>
+          </Pressable>
+          <Pressable
+            disabled={creating}
+            onPress={() => void handleCreateUser()}
+            style={{ backgroundColor: colors.accent }}
+            className="flex-1 items-center rounded-xl py-3.5"
+          >
+            {creating ? (
+              <ActivityIndicator color={colors.accentInk} />
+            ) : (
+              <Text style={{ color: colors.accentInk }} className="text-xs font-bold">
+                Create User
+              </Text>
+            )}
+          </Pressable>
+        </View>
+      </KeyboardModal>
     </View>
   );
 }

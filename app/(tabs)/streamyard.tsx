@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
   Pressable,
   RefreshControl,
   Text,
@@ -13,7 +12,10 @@ import { useRouter, type Href } from "expo-router";
 import { File } from "expo-file-system";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import KeyboardModal from "../../src/components/KeyboardModal";
 import ToastBanner from "../../src/components/ToastBanner";
+import { useTheme } from "../../src/context/ThemeContext";
 import { useNotifications } from "../../src/hooks/useNotifications";
 import { useStreamApi } from "../../src/hooks/useStreamApi";
 import { useToast } from "../../src/hooks/useToast";
@@ -22,6 +24,8 @@ import type { PlaylistDto } from "../../src/types";
 
 export default function Streamyard() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const { listPlaylists, uploadVideo, buildThumbnailUrl } = useStreamApi();
   const { toast, show, hide } = useToast(4500);
 
@@ -34,6 +38,8 @@ export default function Streamyard() {
   const [targetDir, setTargetDir] = useState("movies");
   const [uploadingPct, setUploadingPct] = useState<number | null>(null);
   const [failedThumbs, setFailedThumbs] = useState<Record<string, boolean>>({});
+
+  const fabBottom = Math.max(insets.bottom, 12) + 88;
 
   const loadPlaylists = useCallback(
     async (isPull = false) => {
@@ -91,20 +97,35 @@ export default function Streamyard() {
   };
 
   return (
-    <View className="flex-1 bg-blue-950">
-      {/* Live status header */}
-      <View className="flex-row items-center justify-between border-b border-blue-900 px-4 py-2.5">
-        <Text className="text-xs font-medium text-blue-300">
-          Video library · {playlists.length} {playlists.length === 1 ? "video" : "videos"}
+    <View style={{ backgroundColor: colors.bg }} className="flex-1">
+      {/* Live Status Bar */}
+      <View
+        style={{ borderBottomColor: colors.hairline, borderBottomWidth: 1 }}
+        className="flex-row items-center justify-between px-4 py-3"
+      >
+        <Text style={{ color: colors.inkMuted }} className="text-xs font-medium tracking-wide">
+          Library ·{" "}
+          <Text style={{ color: colors.ink }} className="font-semibold">
+            {playlists.length} {playlists.length === 1 ? "title" : "titles"}
+          </Text>
         </Text>
-        <View className="flex-row items-center rounded-full bg-blue-900 px-2.5 py-1">
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderColor: colors.hairline,
+            borderWidth: 1,
+          }}
+          className="flex-row items-center rounded-full px-3 py-1"
+        >
           <View
-            className={`h-2 w-2 rounded-full ${
-              connected ? "bg-emerald-400" : "bg-amber-400"
-            }`}
+            style={{ backgroundColor: connected ? colors.emerald : colors.amber }}
+            className="h-1.5 w-1.5 rounded-full"
           />
-          <Text className="ml-1.5 text-[11px] font-semibold text-blue-200">
-            {connected ? "WS Live" : "WS Reconnecting"}
+          <Text
+            style={{ color: colors.inkMuted }}
+            className="ml-1.5 text-[10px] font-semibold uppercase tracking-wider"
+          >
+            {connected ? "WS Live" : "Reconnecting"}
           </Text>
         </View>
       </View>
@@ -112,28 +133,52 @@ export default function Streamyard() {
       <ToastBanner toast={toast} onDismiss={hide} />
 
       {uploadingPct !== null && (
-        <View className="mx-4 mt-3 flex-row items-center rounded-xl bg-blue-900 px-4 py-2.5">
-          <ActivityIndicator size="small" color="#bfdbfe" />
-          <Text className="ml-2.5 text-xs font-medium text-blue-100">
-            Uploading video to NAS & Kafka pipeline ({uploadingPct}%)...
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderColor: colors.hairlineStrong,
+            borderWidth: 1,
+          }}
+          className="mx-4 mt-3 flex-row items-center rounded-xl px-4 py-2.5"
+        >
+          <ActivityIndicator size="small" color={colors.accent} />
+          <Text style={{ color: colors.ink }} className="ml-2.5 text-xs font-medium">
+            Uploading video to NAS pipeline ({uploadingPct}%)...
           </Text>
         </View>
       )}
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#bfdbfe" />
-          <Text className="mt-3 text-sm text-blue-300">Loading Streamyard library...</Text>
+          <ActivityIndicator size="small" color={colors.accent} />
+          <Text
+            style={{ color: colors.inkSubtle }}
+            className="mt-3 text-xs uppercase tracking-wider"
+          >
+            Loading library
+          </Text>
         </View>
       ) : error ? (
-        <View className="flex-1 items-center justify-center px-6">
-          <Ionicons name="alert-circle-outline" size={48} color="#f87171" />
-          <Text className="mt-3 text-center text-sm text-red-200">{error}</Text>
+        <View className="flex-1 items-center justify-center px-8 pb-24">
+          <Ionicons name="alert-circle-outline" size={38} color={colors.crimson} />
+          <Text
+            style={{ color: colors.crimson }}
+            className="mt-3 text-center text-xs leading-5"
+          >
+            {error}
+          </Text>
           <Pressable
             onPress={() => void loadPlaylists(false)}
-            className="mt-5 rounded-xl bg-blue-800 px-5 py-2.5"
+            style={{
+              backgroundColor: colors.surface,
+              borderColor: colors.hairlineStrong,
+              borderWidth: 1,
+            }}
+            className="mt-5 rounded-xl px-5 py-2.5"
           >
-            <Text className="font-semibold text-blue-100">Retry</Text>
+            <Text style={{ color: colors.ink }} className="text-xs font-semibold">
+              Retry
+            </Text>
           </Pressable>
         </View>
       ) : (
@@ -141,23 +186,37 @@ export default function Streamyard() {
           data={playlists}
           keyExtractor={(p) => p.path}
           numColumns={2}
-          contentContainerClassName="p-2.5 pb-28"
+          contentContainerStyle={{ padding: 12, paddingBottom: fabBottom + 76 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => void loadPlaylists(true)}
-              tintColor="#bfdbfe"
+              tintColor={colors.accent}
             />
           }
           ListEmptyComponent={
-            <View className="items-center px-6 pt-20">
-              <Ionicons name="film-outline" size={50} color="#3b5bb5" />
-              <Text className="mt-3 text-center text-base font-semibold text-blue-200">
+            <View className="items-center px-8 pt-24">
+              <View
+                style={{
+                  backgroundColor: colors.surface,
+                  borderColor: colors.hairlineStrong,
+                  borderWidth: 1,
+                }}
+                className="h-14 w-14 items-center justify-center rounded-2xl"
+              >
+                <Ionicons name="film-outline" size={26} color={colors.accentWarm} />
+              </View>
+              <Text
+                style={{ color: colors.ink }}
+                className="mt-4 text-center text-base font-semibold"
+              >
                 No encoded videos yet
               </Text>
-              <Text className="mt-1 text-center text-xs text-blue-400">
-                Upload a video using the button below. Once encoded, it will appear here
-                automatically via WebSocket notification.
+              <Text
+                style={{ color: colors.inkMuted }}
+                className="mt-1.5 text-center text-xs leading-5"
+              >
+                Upload a video below. Once encoded via Kafka, it appears here automatically.
               </Text>
             </View>
           }
@@ -173,9 +232,17 @@ export default function Streamyard() {
                   onPress={() =>
                     router.push(`/stream/${encodeURIComponent(item.path)}` as Href)
                   }
-                  className="overflow-hidden rounded-2xl border border-blue-800 bg-blue-900/70"
+                  style={{
+                    backgroundColor: colors.surface,
+                    borderColor: colors.hairline,
+                    borderWidth: 1,
+                  }}
+                  className="overflow-hidden rounded-2xl"
                 >
-                  <View className="h-28 items-center justify-center bg-blue-800">
+                  <View
+                    style={{ backgroundColor: colors.recessed }}
+                    className="relative h-28 items-center justify-center"
+                  >
                     {thumbUri ? (
                       <Image
                         source={{ uri: thumbUri }}
@@ -186,20 +253,33 @@ export default function Streamyard() {
                         }
                       />
                     ) : (
-                      <Ionicons name="play-circle" size={44} color="#bfdbfe" />
+                      <Ionicons
+                        name="play-circle-outline"
+                        size={34}
+                        color={colors.inkSubtle}
+                      />
                     )}
+                    <View className="absolute bottom-2 right-2 rounded-full bg-black/75 px-2 py-0.5">
+                      <Text className="text-[9px] font-bold tracking-wider text-champagne">
+                        HLS
+                      </Text>
+                    </View>
                   </View>
                   <View className="p-3">
-                    <Text className="text-sm font-semibold text-blue-100" numberOfLines={1}>
+                    <Text
+                      style={{ color: colors.ink }}
+                      className="text-xs font-semibold"
+                      numberOfLines={1}
+                    >
                       {title}
                     </Text>
-                    <Text className="mt-0.5 text-[11px] text-blue-400" numberOfLines={1}>
+                    <Text
+                      style={{ color: colors.inkSubtle }}
+                      className="mt-0.5 font-mono text-[10px]"
+                      numberOfLines={1}
+                    >
                       {item.path}
                     </Text>
-                    <View className="mt-2 flex-row items-center">
-                      <View className="h-2 w-2 rounded-full bg-emerald-400" />
-                      <Text className="ml-1.5 text-[11px] text-blue-300">HLS Ready</Text>
-                    </View>
                   </View>
                 </Pressable>
               </View>
@@ -208,60 +288,81 @@ export default function Streamyard() {
         />
       )}
 
-      {/* Upload Video FAB */}
+      {/* Upload Video FAB (lifted above floating glass bar) */}
       <Pressable
         onPress={() => setUploadModalOpen(true)}
-        className="absolute bottom-6 right-6 flex-row items-center rounded-full bg-blue-200 px-4 py-3.5 shadow-lg"
+        style={{
+          bottom: fabBottom,
+          backgroundColor: colors.accent,
+        }}
+        className="absolute right-5 flex-row items-center rounded-full px-5 py-3.5 shadow-lg"
       >
-        <Ionicons name="videocam-outline" size={22} color="#172554" />
-        <Text className="ml-2 text-sm font-bold text-blue-950">Upload Video</Text>
+        <Ionicons name="videocam-outline" size={18} color={colors.accentInk} />
+        <Text
+          style={{ color: colors.accentInk }}
+          className="ml-2 text-xs font-bold tracking-wide"
+        >
+          Upload Video
+        </Text>
       </Pressable>
 
       {/* Video Upload Folder Modal */}
-      <Modal
+      <KeyboardModal
         visible={uploadModalOpen}
-        transparent
-        animationType="fade"
+        variant="center"
         onRequestClose={() => setUploadModalOpen(false)}
       >
-        <View className="flex-1 items-center justify-center bg-black/70 px-6">
-          <View className="w-full max-w-md rounded-3xl border border-blue-700 bg-blue-900 p-6">
-            <Text className="text-lg font-bold text-blue-100">Upload Video for HLS</Text>
-            <Text className="mt-1 text-xs text-blue-300">
-              Uploads via /api/v1/videos/upload into your workspace, then transcodes
-              automatically via Kafka.
-            </Text>
+        <Text style={{ color: colors.ink }} className="text-base font-semibold">
+          Upload Video for HLS
+        </Text>
+        <Text style={{ color: colors.inkMuted }} className="mt-1.5 text-xs leading-4">
+          Uploads via /api/v1/videos/upload into your workspace, then transcodes
+          automatically via Kafka.
+        </Text>
 
-            <Text className="mb-1.5 mt-4 text-xs font-semibold uppercase tracking-wider text-blue-400">
-              Target Folder (optional)
-            </Text>
-            <TextInput
-              value={targetDir}
-              onChangeText={setTargetDir}
-              placeholder="e.g. movies (or leave empty for root)"
-              placeholderTextColor="#6b8bd6"
-              autoCapitalize="none"
-              autoCorrect={false}
-              className="rounded-xl bg-blue-950 px-4 py-3 text-sm text-blue-100"
-            />
+        <Text
+          style={{ color: colors.inkSubtle }}
+          className="mb-1.5 mt-4 text-[11px] font-semibold uppercase tracking-[0.14em]"
+        >
+          Target Folder (optional)
+        </Text>
+        <TextInput
+          value={targetDir}
+          onChangeText={setTargetDir}
+          placeholder="e.g. movies (or leave empty for root)"
+          placeholderTextColor={colors.inkSubtle}
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={{
+            backgroundColor: colors.recessed,
+            borderColor: colors.hairlineStrong,
+            borderWidth: 1,
+            color: colors.ink,
+          }}
+          className="rounded-xl px-4 py-3 text-sm"
+        />
 
-            <View className="mt-5 flex-row gap-3">
-              <Pressable
-                onPress={() => setUploadModalOpen(false)}
-                className="flex-1 items-center rounded-xl border border-blue-700 py-3"
-              >
-                <Text className="font-semibold text-blue-200">Cancel</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => void handlePickAndUploadVideo()}
-                className="flex-1 items-center rounded-xl bg-blue-200 py-3"
-              >
-                <Text className="font-bold text-blue-950">Pick Video</Text>
-              </Pressable>
-            </View>
-          </View>
+        <View className="mt-5 flex-row gap-3">
+          <Pressable
+            onPress={() => setUploadModalOpen(false)}
+            style={{ borderColor: colors.hairlineStrong, borderWidth: 1 }}
+            className="flex-1 items-center rounded-xl py-3"
+          >
+            <Text style={{ color: colors.inkMuted }} className="text-xs font-semibold">
+              Cancel
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => void handlePickAndUploadVideo()}
+            style={{ backgroundColor: colors.accent }}
+            className="flex-1 items-center rounded-xl py-3"
+          >
+            <Text style={{ color: colors.accentInk }} className="text-xs font-bold">
+              Pick Video
+            </Text>
+          </Pressable>
         </View>
-      </Modal>
+      </KeyboardModal>
     </View>
   );
 }

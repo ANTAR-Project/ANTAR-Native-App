@@ -124,3 +124,69 @@ export interface GatewayProblem {
   error?: string;
   message?: string;
 }
+
+export interface CameraDevice {
+  entity_id?: string;
+  entityId?: string;
+  device_id?: string;
+  deviceId?: string;
+  name?: string;
+  ip?: string;
+  status?: string;
+  online?: boolean;
+  type?: string;
+  [key: string]: unknown;
+}
+
+export interface CameraStreamUrlsResponse {
+  entity_id: string;
+  device_id: string;
+  hls_stream_url: string;
+  snapshot_url: string;
+  live_stream_url: string;
+  substream_rtsp: string;
+  mainstream_rtsp: string;
+  protocol: string;
+}
+
+export type CameraPtzCommand =
+  | "PTZ_LEFT"
+  | "PTZ_RIGHT"
+  | "PTZ_UP"
+  | "PTZ_DOWN"
+  | "PTZ_ZOOM_IN"
+  | "PTZ_ZOOM_OUT"
+  | "PTZ_STOP"
+  | (string & {});
+
+export interface CameraPtzRequest {
+  command: CameraPtzCommand;
+  speed?: number;
+}
+
+export interface CameraRecordingInfo {
+  id: string;
+  filename: string;
+  sizeBytes: number;
+  timestamp: string | number;
+  status: string;
+}
+
+export interface CameraRecordResponse {
+  status: string;
+  recording: CameraRecordingInfo;
+}
+
+export interface CameraStatusResponse {
+  subnet: string;
+  default_ip: string;
+  rtsp_port: number;
+  http_port: number;
+  online_cameras: number;
+  total_cameras: number;
+}
+
+export interface CameraScanResponse {
+  count: number;
+  cameras: CameraDevice[];
+}

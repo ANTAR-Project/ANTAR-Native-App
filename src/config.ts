@@ -81,3 +81,40 @@ export function getNotificationsWsUrl(token: string): string {
   const wsBase = base.replace(/^https:/i, "wss:").replace(/^http:/i, "ws:");
   return `${wsBase}/ws/notifications?token=${encodeURIComponent(token)}`;
 }
+
+const DEFAULT_IGNORED_FILES = [
+  ".ds_store",
+  "._*",
+  "thumbs.db",
+  "desktop.ini",
+  ".spotlight-v100",
+  ".trashes",
+  ".fseventsd",
+  ".temporaryitems",
+];
+
+function compilePattern(pattern: string): RegExp {
+  const escaped = pattern
+    .trim()
+    .toLowerCase()
+    .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*");
+  return new RegExp(`^${escaped}$`, "i");
+}
+
+const IGNORED_FILE_REGEXES: RegExp[] = (() => {
+  const raw = process.env.EXPO_PUBLIC_IGNORED_FILES?.trim();
+  const patterns = raw
+    ? raw
+        .split(",")
+        .map((p) => p.trim())
+        .filter(Boolean)
+    : DEFAULT_IGNORED_FILES;
+  return patterns.map(compilePattern);
+})();
+
+export function isIgnoredNasEntry(name: string): boolean {
+  const clean = name.replace(/\/+$/, "").trim();
+  if (!clean) return false;
+  return IGNORED_FILE_REGEXES.some((re) => re.test(clean));
+}
