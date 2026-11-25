@@ -1,9 +1,83 @@
-const HOST = process.env.EXPO_PUBLIC_API_HOST ?? "localhost";
+import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 
-export const AUTH_API = `http://${HOST}:8085/api/v1/auth-service`;
-export const STREAM_API = `http://${HOST}:8084/api/v1/stream`;
-export const MOCK_AUTH = process.env.EXPO_PUBLIC_MOCK_AUTH === "true";
-export const MOCK_DATA = MOCK_AUTH;
+const GATEWAY_URL_STORAGE_KEY = "antar_gateway_url";
 
-// Public demo HLS stream, used only while mock mode is on
-export const DEMO_HLS = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
+function buildDefaultGatewayUrl(): string {
+  const explicit = process.env.EXPO_PUBLIC_GATEWAY_URL?.trim();
+  if (explicit) return explicit.replace(/\/+$/, "");
+
+  const scheme = process.env.EXPO_PUBLIC_API_SCHEME?.trim() || "http";
+  const host = process.env.EXPO_PUBLIC_API_HOST?.trim() || "localhost";
+  const port = process.env.EXPO_PUBLIC_API_PORT?.trim() || "8443";
+  return `${scheme}://${host}:${port}`;
+}
+
+export const DEFAULT_GATEWAY_URL = buildDefaultGatewayUrl();
+
+let currentGatewayUrl = DEFAULT_GATEWAY_URL;
+
+export function normalizeGatewayUrl(raw: string): string {
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  if (!trimmed) return DEFAULT_GATEWAY_URL;
+
+  const withScheme = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : `http://${trimmed}`;
+
+  try {
+    const parsed = new URL(withScheme);
+    if (!parsed.port && !trimmed.includes(":8443") && !/^https?:\/\/[^/:]+:\d+/.test(withScheme)) {
+      parsed.port = "8443";
+    }
+    return parsed.toString().replace(/\/+$/, "");
+  } catch {
+    return withScheme;
+  }
+}
+
+export function getGatewayUrl(): string {
+  return currentGatewayUrl;
+}
+
+export function setGatewayUrlInMemory(url: string): string {
+  currentGatewayUrl = normalizeGatewayUrl(url);
+  return currentGatewayUrl;
+}
+
+export async function loadPersistedGatewayUrl(): Promise<string> {
+  try {
+    if (Platform.OS === "web" && typeof localStorage !== "undefined") {
+      const v = localStorage.getItem(GATEWAY_URL_STORAGE_KEY);
+      if (v) currentGatewayUrl = normalizeGatewayUrl(v);
+      return currentGatewayUrl;
+    }
+    const stored = await SecureStore.getItemAsync(GATEWAY_URL_STORAGE_KEY);
+    if (stored) {
+      currentGatewayUrl = normalizeGatewayUrl(stored);
+    }
+  } catch {
+    // Fallback to default
+  }
+  return currentGatewayUrl;
+}
+
+export async function saveGatewayUrl(url: string): Promise<string> {
+  const normalized = setGatewayUrlInMemory(url);
+  try {
+    if (Platform.OS === "web" && typeof localStorage !== "undefined") {
+      localStorage.setItem(GATEWAY_URL_STORAGE_KEY, normalized);
+    } else {
+      await SecureStore.setItemAsync(GATEWAY_URL_STORAGE_KEY, normalized);
+    }
+  } catch {
+    // Ignore storage failure
+  }
+  return normalized;
+}
+
+export function getNotificationsWsUrl(token: string): string {
+  const base = getGatewayUrl();
+  const wsBase = base.replace(/^https:/i, "wss:").replace(/^http:/i, "ws:");
+  return `${wsBase}/ws/notifications?token=${encodeURIComponent(token)}`;
+}
