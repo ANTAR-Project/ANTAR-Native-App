@@ -92,6 +92,16 @@ export interface PlaylistDto {
   thumbnailUrl: string | null;
 }
 
+export interface StreamQualityOption {
+  id: string;
+  label: string;
+  resolution?: string;
+  width?: number;
+  height?: number;
+  bandwidth?: number;
+  uri: string;
+}
+
 export interface NotificationPayload {
   type: string;
   rawPath: string;

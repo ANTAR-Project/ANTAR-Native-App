@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
-import { useVideoPlayer, VideoView, type VideoSource } from "expo-video";
+import { useVideoPlayer, VideoView, type VideoSource, type VideoTrack } from "expo-video";
 import { useTheme } from "../context/ThemeContext";
 
 interface Props {
@@ -9,6 +9,14 @@ interface Props {
   loop?: boolean;
   controls?: boolean;
   onErrorChange?: (error: string | null) => void;
+  onVideoTrackChange?: (track: VideoTrack | null) => void;
+}
+
+function getSourceKey(source: VideoSource): string {
+  if (typeof source === "object" && source !== null) {
+    return source.uri ?? String(source.assetId ?? "");
+  }
+  return String(source ?? "");
 }
 
 export default function VideoStage({
@@ -17,9 +25,14 @@ export default function VideoStage({
   loop = false,
   controls = true,
   onErrorChange,
+  onVideoTrackChange,
 }: Props) {
   const { colors } = useTheme();
-  const player = useVideoPlayer(source, (p) => {
+  const [initialSource] = useState(source);
+  const lastSourceKeyRef = useRef(getSourceKey(source));
+  const pendingResumeRef = useRef<{ time: number; play: boolean } | null>(null);
+
+  const player = useVideoPlayer(initialSource, (p) => {
     p.muted = muted;
     p.loop = loop;
     p.play();
@@ -29,14 +42,51 @@ export default function VideoStage({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const sub = player.addListener("statusChange", ({ status: nextStatus, error: err }) => {
+    const nextKey = getSourceKey(source);
+    if (nextKey === lastSourceKeyRef.current) return;
+    lastSourceKeyRef.current = nextKey;
+
+    const resumeTime = Number.isFinite(player.currentTime) ? player.currentTime : 0;
+    const wasPlaying = player.playing;
+    pendingResumeRef.current = { time: resumeTime, play: wasPlaying };
+    setError(null);
+    onErrorChange?.(null);
+
+    void player.replaceAsync(source).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Failed to switch stream quality";
+      setError(msg);
+      onErrorChange?.(msg);
+    });
+  }, [onErrorChange, player, source]);
+
+  useEffect(() => {
+    const statusSub = player.addListener("statusChange", ({ status: nextStatus, error: err }) => {
       setStatus(nextStatus);
       const msg = nextStatus === "error" ? err?.message ?? "Playback failed" : null;
       setError(msg);
       onErrorChange?.(msg);
+
+      if (nextStatus === "readyToPlay" && pendingResumeRef.current) {
+        const { time, play } = pendingResumeRef.current;
+        pendingResumeRef.current = null;
+        if (time > 0) {
+          player.currentTime = time;
+        }
+        if (play) {
+          player.play();
+        }
+      }
     });
-    return () => sub.remove();
-  }, [onErrorChange, player]);
+
+    const trackSub = player.addListener("videoTrackChange", ({ videoTrack }) => {
+      onVideoTrackChange?.(videoTrack);
+    });
+
+    return () => {
+      statusSub.remove();
+      trackSub.remove();
+    };
+  }, [onErrorChange, onVideoTrackChange, player]);
 
   return (
     <View
