@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
+import { useTheme } from "../../src/context/ThemeContext";
 import { SEEDED_POLICY_MATRIX } from "../../src/policies";
 import type { UserRole } from "../../src/types";
 
@@ -8,6 +9,7 @@ type RoleFilter = UserRole | "SERVICE";
 const ROLES: RoleFilter[] = ["OWNER", "RESIDENT", "GUEST", "SERVICE"];
 
 export default function PolicyMatrixScreen() {
+  const { colors } = useTheme();
   const [selectedRole, setSelectedRole] = useState<RoleFilter>("OWNER");
 
   const rules = SEEDED_POLICY_MATRIX.filter((r) => r.role === selectedRole);
@@ -15,12 +17,13 @@ export default function PolicyMatrixScreen() {
   const denyCount = rules.filter((r) => r.effect === "DENY").length;
 
   return (
-    <View className="flex-1 bg-blue-950">
+    <View style={{ backgroundColor: colors.bg }} className="flex-1">
       {/* Role picker */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        className="max-h-16 border-b border-blue-900"
+        style={{ borderBottomColor: colors.hairline, borderBottomWidth: 1 }}
+        className="max-h-14"
         contentContainerClassName="items-center gap-2 px-4"
       >
         {ROLES.map((r) => {
@@ -29,12 +32,16 @@ export default function PolicyMatrixScreen() {
             <Pressable
               key={r}
               onPress={() => setSelectedRole(r)}
-              className={`rounded-full px-4 py-2 ${active ? "bg-blue-200" : "bg-blue-900"}`}
+              style={{
+                backgroundColor: active ? colors.accent : colors.surface,
+                borderColor: active ? colors.accent : colors.hairlineStrong,
+                borderWidth: 1,
+              }}
+              className="rounded-full px-4 py-1.5"
             >
               <Text
-                className={`text-xs font-bold ${
-                  active ? "text-blue-950" : "text-blue-200"
-                }`}
+                style={{ color: active ? colors.accentInk : colors.inkMuted }}
+                className="text-[11px] font-bold tracking-wider"
               >
                 {r}
               </Text>
@@ -44,11 +51,18 @@ export default function PolicyMatrixScreen() {
       </ScrollView>
 
       <ScrollView contentContainerClassName="p-4 pb-12">
-        <View className="rounded-2xl border border-blue-800 bg-blue-900/60 p-4">
-          <Text className="text-sm font-bold text-blue-100">
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderColor: colors.hairline,
+            borderWidth: 1,
+          }}
+          className="rounded-2xl p-4"
+        >
+          <Text style={{ color: colors.ink }} className="text-sm font-semibold">
             {selectedRole} · {allowCount} ALLOW / {denyCount} DENY
           </Text>
-          <Text className="mt-1 text-xs leading-4 text-blue-300">
+          <Text style={{ color: colors.inkMuted }} className="mt-1.5 text-xs leading-4">
             Enforced server-side by policy-registry (gRPC :9001) & api-gateway.
             DENY (priority 100) overrides ALLOW; unmatched requests default to DENY.
           </Text>
@@ -58,40 +72,62 @@ export default function PolicyMatrixScreen() {
           {rules.map((rule, idx) => (
             <View
               key={`${rule.ruleName}-${rule.scope}-${rule.qualifier ?? "none"}-${idx}`}
-              className="rounded-2xl border border-blue-800 bg-blue-900/70 p-3.5"
+              style={{
+                backgroundColor: colors.surface,
+                borderColor: colors.hairline,
+                borderWidth: 1,
+              }}
+              className="rounded-2xl p-4"
             >
-              <View className="flex-row items-center justify-between">
-                <Text className="flex-1 font-mono text-xs font-bold text-blue-100">
+              <View className="flex-row items-center justify-between gap-2">
+                <Text
+                  style={{ color: colors.ink }}
+                  className="flex-1 font-mono text-xs font-semibold"
+                >
                   {rule.ruleName}
                 </Text>
                 <View
-                  className={`rounded-full px-2.5 py-0.5 ${
-                    rule.effect === "ALLOW" ? "bg-emerald-950" : "bg-red-950"
-                  }`}
+                  style={{
+                    backgroundColor:
+                      rule.effect === "ALLOW" ? colors.emeraldBg : colors.crimsonBg,
+                    borderColor:
+                      rule.effect === "ALLOW"
+                        ? colors.emeraldBorder
+                        : colors.crimsonBorder,
+                    borderWidth: 1,
+                  }}
+                  className="rounded-full px-2.5 py-0.5"
                 >
                   <Text
-                    className={`text-[10px] font-bold ${
-                      rule.effect === "ALLOW" ? "text-emerald-300" : "text-red-300"
-                    }`}
+                    style={{
+                      color:
+                        rule.effect === "ALLOW" ? colors.emerald : colors.crimson,
+                    }}
+                    className="text-[10px] font-bold"
                   >
-                    {rule.effect} (p{rule.priority})
+                    {rule.effect} · p{rule.priority}
                   </Text>
                 </View>
               </View>
 
-              <Text className="mt-1.5 text-xs text-blue-300">
+              <Text style={{ color: colors.inkMuted }} className="mt-1.5 text-xs">
                 {rule.domain} · {rule.action} {rule.resourceType} · Scope: {rule.scope}
                 {rule.qualifier ? ` · Target: ${rule.qualifier}` : ""}
               </Text>
 
               {rule.conditions !== "{}" && (
-                <Text className="mt-1 font-mono text-[11px] text-amber-300">
+                <Text
+                  style={{ color: colors.accentWarm }}
+                  className="mt-1.5 font-mono text-[11px]"
+                >
                   conditions: {rule.conditions}
                 </Text>
               )}
 
               {rule.note && (
-                <Text className="mt-1 text-[11px] text-blue-400">{rule.note}</Text>
+                <Text style={{ color: colors.inkSubtle }} className="mt-1 text-[11px]">
+                  {rule.note}
+                </Text>
               )}
             </View>
           ))}

@@ -13,13 +13,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import BrandLogo from "../src/components/BrandLogo";
 import { useAuth } from "../src/context/AuthContext";
+import { useTheme } from "../src/context/ThemeContext";
 import { useAuthApi } from "../src/hooks/useAuthApi";
 import { useBiometrics } from "../src/hooks/useBiometrics";
 import type { Session, UserRole } from "../src/types";
-
-const inputClass = "rounded-2xl bg-blue-900 px-5 py-4 text-base text-blue-100 border border-blue-800";
-const PLACEHOLDER = "#6b8bd6";
 
 function normalizeRoleHint(raw?: string): UserRole {
   const up = (raw ?? "").toUpperCase();
@@ -35,6 +34,7 @@ export default function Auth() {
     roleHint === "OWNER" ? "Owner" : roleHint === "GUEST" ? "Guest" : "Resident";
 
   const { gatewayUrl, signIn, readVault, saveVault, clearVault } = useAuth();
+  const { isDark, colors, toggleMode } = useTheme();
   const { login, refreshWithToken } = useAuthApi();
   const { check, authenticate } = useBiometrics();
 
@@ -62,7 +62,7 @@ export default function Auth() {
     new Promise<boolean>((resolve) =>
       Alert.alert(
         "Enable biometric sign-in?",
-        "Use your fingerprint or Face ID to unlock and refresh your session next time.",
+        "Use biometrics to unlock and rotate your session on next launch.",
         [
           { text: "Not now", style: "cancel", onPress: () => resolve(false) },
           { text: "Enable", onPress: () => resolve(true) },
@@ -104,19 +104,18 @@ export default function Auth() {
       return setError("This device has no biometric sensor.");
     }
     if (status === "not-enrolled") {
-      return setError("No biometrics enrolled. Add one in your device settings.");
+      return setError("No biometrics enrolled in device settings.");
     }
 
     const vault = await readVault();
     if (!vault?.refreshToken) {
-      return setError("Biometric sign-in isn't set up yet. Sign in with password first.");
+      return setError("Biometric sign-in isn't configured yet. Sign in with password first.");
     }
 
     setBusy(true);
     try {
       if (!(await authenticate("Sign in to AN | TAR."))) return;
       try {
-        // Rotate refresh token against /api/v1/auth/refresh so expired/revoked sessions are caught
         const refreshed = await refreshWithToken(vault.refreshToken);
         await saveVault(refreshed);
         await finish(refreshed);
@@ -132,68 +131,139 @@ export default function Auth() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-blue-950">
+    <SafeAreaView style={{ backgroundColor: colors.bg }} className="flex-1">
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1"
       >
         <ScrollView
-          contentContainerClassName="px-6 pb-10 pt-4"
+          contentContainerClassName="flex-grow px-6 pb-10 pt-4"
           keyboardShouldPersistTaps="handled"
         >
-          <Pressable onPress={() => router.back()} hitSlop={12} className="flex-row items-center">
-            <Ionicons name="arrow-back" size={18} color="#93c5fd" />
-            <Text className="ml-1.5 text-base text-blue-300">Back</Text>
-          </Pressable>
+          <View className="flex-row items-center justify-between">
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={12}
+              className="flex-row items-center"
+            >
+              <Ionicons name="chevron-back" size={18} color={colors.inkMuted} />
+              <Text style={{ color: colors.inkMuted }} className="ml-1 text-sm">
+                Back
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={toggleMode}
+              hitSlop={10}
+              style={{
+                backgroundColor: colors.surface,
+                borderColor: colors.hairlineStrong,
+                borderWidth: 1,
+              }}
+              className="flex-row items-center rounded-full px-3 py-1.5"
+            >
+              <Ionicons
+                name={isDark ? "sunny-outline" : "moon-outline"}
+                size={13}
+                color={colors.accentWarm}
+              />
+              <Text
+                style={{ color: colors.inkMuted }}
+                className="ml-1.5 text-[11px] font-semibold"
+              >
+                {isDark ? "Light" : "Dark"}
+              </Text>
+            </Pressable>
+          </View>
 
           <View className="mt-6 items-center">
-            <Text className="text-3xl font-bold text-blue-200">AN | TAR.</Text>
-            <View className="mt-3 flex-row items-center rounded-full bg-blue-900 px-4 py-1.5 border border-blue-800">
-              <Text className="text-xs font-semibold uppercase tracking-wider text-blue-200">
+            <BrandLogo size={68} />
+            <Text
+              style={{ color: colors.ink }}
+              className="mt-3 text-2xl font-light tracking-[0.22em]"
+            >
+              AN | TAR.
+            </Text>
+            <View
+              style={{
+                backgroundColor: colors.surface,
+                borderColor: colors.hairlineStrong,
+                borderWidth: 1,
+              }}
+              className="mt-3 rounded-full px-3.5 py-1"
+            >
+              <Text
+                style={{ color: colors.accentWarm }}
+                className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+              >
                 {roleLabel} Sign In
               </Text>
             </View>
-            <Text className="mt-2 text-xs text-blue-400" numberOfLines={1}>
-              Gateway: {gatewayUrl}
+            <Text
+              style={{ color: colors.inkSubtle }}
+              className="mt-2 font-mono text-[11px]"
+              numberOfLines={1}
+            >
+              {gatewayUrl}
             </Text>
           </View>
 
           {/* Form */}
           <View className="mt-8 gap-4">
             <View>
-              <Text className="mb-1.5 ml-1 text-xs font-semibold uppercase tracking-wider text-blue-400">
+              <Text
+                style={{ color: colors.inkSubtle }}
+                className="mb-2 ml-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
+              >
                 Username
               </Text>
               <TextInput
                 value={username}
                 onChangeText={setUsername}
-                placeholder="e.g. owner, resident01, guest01"
-                placeholderTextColor={PLACEHOLDER}
+                placeholder="owner, resident01, or guest01"
+                placeholderTextColor={colors.inkSubtle}
                 autoCapitalize="none"
                 autoCorrect={false}
-                className={inputClass}
+                style={{
+                  backgroundColor: colors.recessed,
+                  borderColor: colors.hairlineStrong,
+                  borderWidth: 1,
+                  color: colors.ink,
+                }}
+                className="rounded-2xl px-4 py-3.5 text-sm"
               />
             </View>
 
             <View>
-              <Text className="mb-1.5 ml-1 text-xs font-semibold uppercase tracking-wider text-blue-400">
+              <Text
+                style={{ color: colors.inkSubtle }}
+                className="mb-2 ml-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
+              >
                 Password
               </Text>
-              <View className="flex-row items-center rounded-2xl border border-blue-800 bg-blue-900 pr-3">
+              <View
+                style={{
+                  backgroundColor: colors.recessed,
+                  borderColor: colors.hairlineStrong,
+                  borderWidth: 1,
+                }}
+                className="flex-row items-center rounded-2xl pr-3.5"
+              >
                 <TextInput
                   value={password}
                   onChangeText={setPassword}
                   placeholder="Enter password"
-                  placeholderTextColor={PLACEHOLDER}
+                  placeholderTextColor={colors.inkSubtle}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
-                  className="flex-1 px-5 py-4 text-base text-blue-100"
+                  style={{ color: colors.ink }}
+                  className="flex-1 px-4 py-3.5 text-sm"
                 />
                 <Pressable onPress={() => setShowPassword((v) => !v)} hitSlop={10}>
                   <Ionicons
                     name={showPassword ? "eye-off-outline" : "eye-outline"}
-                    size={22}
-                    color="#93c5fd"
+                    size={19}
+                    color={colors.inkMuted}
                   />
                 </Pressable>
               </View>
@@ -201,52 +271,83 @@ export default function Auth() {
           </View>
 
           {error && (
-            <View className="mt-4 flex-row items-center rounded-xl border border-red-400/50 bg-red-950/60 px-3.5 py-2.5">
-              <Ionicons name="alert-circle-outline" size={18} color="#fca5a5" />
-              <Text className="ml-2 flex-1 text-sm text-red-200">{error}</Text>
+            <View
+              style={{
+                backgroundColor: colors.crimsonBg,
+                borderColor: colors.crimsonBorder,
+                borderWidth: 1,
+              }}
+              className="mt-4 flex-row items-center rounded-2xl px-4 py-3"
+            >
+              <Ionicons name="alert-circle-outline" size={18} color={colors.crimson} />
+              <Text
+                style={{ color: colors.crimson }}
+                className="ml-2.5 flex-1 text-xs leading-4"
+              >
+                {error}
+              </Text>
             </View>
           )}
 
           <Pressable
             onPress={handleLogin}
             disabled={busy}
-            className="mt-6 items-center rounded-2xl bg-blue-200 py-4"
+            style={{ backgroundColor: colors.accent }}
+            className="mt-6 items-center rounded-2xl py-4"
           >
             {busy ? (
-              <ActivityIndicator color="#172554" />
+              <ActivityIndicator color={colors.accentInk} />
             ) : (
-              <Text className="text-lg font-bold text-blue-950">Sign In</Text>
+              <Text
+                style={{ color: colors.accentInk }}
+                className="text-sm font-bold tracking-wide"
+              >
+                Sign In
+              </Text>
             )}
           </Pressable>
 
-          {/* Policy note: no self-registration in auth-service */}
-          <View className="mt-5 rounded-2xl border border-blue-800/80 bg-blue-900/40 p-3.5">
-            <Text className="text-xs leading-4 text-blue-300">
-              Accounts are created strictly by the <Text className="font-semibold text-blue-100">OWNER</Text>{" "}
-              (per Hearth auth policy). Your assigned role is verified from your signed JWT on login.
-            </Text>
-          </View>
+          <Text
+            style={{ color: colors.inkSubtle }}
+            className="mt-4 text-center text-[11px] leading-4"
+          >
+            Accounts are provisioned by the Owner. Authoritative role is verified from
+            your signed JWT upon authentication.
+          </Text>
 
-          {/* Biometrics */}
-          <View className="my-6 flex-row items-center">
-            <View className="h-px flex-1 bg-blue-800" />
-            <Text className="mx-3 text-xs uppercase tracking-widest text-blue-400">or</Text>
-            <View className="h-px flex-1 bg-blue-800" />
+          <View className="my-7 flex-row items-center">
+            <View style={{ backgroundColor: colors.hairline }} className="h-px flex-1" />
+            <Text
+              style={{ color: colors.inkSubtle }}
+              className="mx-3 text-[10px] font-semibold uppercase tracking-[0.18em]"
+            >
+              or
+            </Text>
+            <View style={{ backgroundColor: colors.hairline }} className="h-px flex-1" />
           </View>
 
           <Pressable
             onPress={handleFingerprint}
             disabled={busy}
-            className="items-center rounded-2xl border-2 border-blue-700 bg-blue-900/40 py-5"
+            style={{
+              backgroundColor: colors.surface,
+              borderColor: colors.hairlineStrong,
+              borderWidth: 1,
+            }}
+            className="items-center rounded-2xl py-5"
           >
-            <Ionicons name="finger-print" size={38} color="#bfdbfe" />
-            <Text className="mt-1.5 text-base font-semibold text-blue-100">
-              {vaultUser ? `Unlock as ${vaultUser}` : "Sign in with Biometrics"}
+            <Ionicons
+              name="finger-print"
+              size={32}
+              color={fingerprintReady ? colors.accentWarm : colors.inkMuted}
+            />
+            <Text style={{ color: colors.ink }} className="mt-2 text-sm font-semibold">
+              {vaultUser ? `Unlock as ${vaultUser}` : "Biometric Sign In"}
             </Text>
-            <Text className="mt-0.5 text-xs text-blue-400">
+            <Text style={{ color: colors.inkSubtle }} className="mt-0.5 text-[11px]">
               {fingerprintReady
                 ? "Rotates refresh token securely on unlock"
-                : "Set up automatically after your first sign-in"}
+                : "Available after first password sign-in"}
             </Text>
           </Pressable>
         </ScrollView>

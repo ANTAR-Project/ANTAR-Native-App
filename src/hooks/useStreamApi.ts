@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { File, UploadType } from "expo-file-system";
+import type { VideoSourceObject } from "expo-video";
 import { gatewayJson } from "../api/client";
 import { getGatewayUrl } from "../config";
 import { useAuth } from "../context/AuthContext";
@@ -68,13 +69,20 @@ export function useStreamApi() {
     [authToken]
   );
 
-  /** Builds authenticated HLS master playlist URL for expo-video */
-  const buildStreamUrl = useCallback(
-    (path: string): string => {
+  /**
+   * Builds authenticated HLS VideoSource for expo-video.
+   * Uses Authorization header (not ?token=) so api-gateway strips the user JWT before
+   * forwarding to streaming-service, allowing streaming-service to use its own service token
+   * when calling nas-orchestrator gRPC, and explicitly sets contentType: "hls" for iOS AVPlayer.
+   */
+  const buildStreamSource = useCallback(
+    (path: string): VideoSourceObject => {
       const token = session?.accessToken ?? "";
-      return `${getGatewayUrl()}/api/v1/stream?path=${encodeURIComponent(
-        path
-      )}&token=${encodeURIComponent(token)}`;
+      return {
+        uri: `${getGatewayUrl()}/api/v1/stream?path=${encodeURIComponent(path)}`,
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        contentType: "hls",
+      };
     },
     [session?.accessToken]
   );
@@ -94,7 +102,7 @@ export function useStreamApi() {
   return {
     listPlaylists,
     uploadVideo,
-    buildStreamUrl,
+    buildStreamSource,
     buildThumbnailUrl,
   };
 }

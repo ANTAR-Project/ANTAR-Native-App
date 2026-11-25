@@ -10,7 +10,9 @@ import {
 } from "react-native";
 import { useRouter, type Href } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ToastBanner from "../../src/components/ToastBanner";
+import { useTheme } from "../../src/context/ThemeContext";
 import { useOwnerApi } from "../../src/hooks/useOwnerApi";
 import { useToast } from "../../src/hooks/useToast";
 import { SEEDED_POLICY_MATRIX } from "../../src/policies";
@@ -21,13 +23,13 @@ type IconName = React.ComponentProps<typeof Ionicons>["name"];
 const ITEMS: { title: string; desc: string; icon: IconName; href: string }[] = [
   {
     title: "Users & Workspaces",
-    desc: "Create Resident/Guest accounts and provision their NAS workspace directories.",
+    desc: "Create Resident or Guest accounts and provision their NAS workspace directories.",
     icon: "people-outline",
     href: "/owner/workspaces",
   },
   {
     title: "Hearth Policy Matrix",
-    desc: "Inspect the 69 active policy rules across OWNER, RESIDENT, GUEST, and SERVICE.",
+    desc: "Inspect all 69 active policy rules across OWNER, RESIDENT, GUEST, and SERVICE.",
     icon: "key-outline",
     href: "/owner/permissions",
   },
@@ -35,6 +37,8 @@ const ITEMS: { title: string; desc: string; icon: IconName; href: string }[] = [
 
 export default function Panel() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const { listUsers, clearShared } = useOwnerApi();
   const { toast, show, hide } = useToast();
 
@@ -42,6 +46,8 @@ export default function Panel() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  const bottomPad = Math.max(insets.bottom, 12) + 100;
 
   const loadUsers = useCallback(
     async (isPull = false) => {
@@ -94,84 +100,147 @@ export default function Panel() {
 
   return (
     <ScrollView
-      className="flex-1 bg-blue-950"
-      contentContainerClassName="p-4 pb-12"
+      style={{ backgroundColor: colors.bg }}
+      className="flex-1"
+      contentContainerStyle={{ padding: 16, paddingBottom: bottomPad }}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
           onRefresh={() => void loadUsers(true)}
-          tintColor="#bfdbfe"
+          tintColor={colors.accent}
         />
       }
     >
       <ToastBanner toast={toast} onDismiss={hide} />
 
-      {/* Live Stats */}
-      <View className="mt-1 flex-row gap-2.5">
-        <View className="flex-1 rounded-2xl border border-blue-800 bg-blue-900/70 p-4">
+      {/* Metric Strip */}
+      <View
+        style={{
+          backgroundColor: colors.surface,
+          borderColor: colors.hairline,
+          borderWidth: 1,
+        }}
+        className="mt-1 flex-row overflow-hidden rounded-2xl"
+      >
+        <View className="flex-1 p-4">
           {loading ? (
-            <ActivityIndicator size="small" color="#bfdbfe" />
+            <ActivityIndicator size="small" color={colors.accent} />
           ) : (
-            <Text className="text-2xl font-bold text-blue-100">{residentsCount}</Text>
+            <Text style={{ color: colors.ink }} className="text-2xl font-semibold">
+              {residentsCount}
+            </Text>
           )}
-          <Text className="mt-0.5 text-xs text-blue-300">Residents</Text>
+          <Text
+            style={{ color: colors.inkSubtle }}
+            className="mt-1 text-[11px] uppercase tracking-wider"
+          >
+            Residents
+          </Text>
         </View>
-        <View className="flex-1 rounded-2xl border border-blue-800 bg-blue-900/70 p-4">
+        <View style={{ backgroundColor: colors.hairline }} className="w-px" />
+        <View className="flex-1 p-4">
           {loading ? (
-            <ActivityIndicator size="small" color="#bfdbfe" />
+            <ActivityIndicator size="small" color={colors.accent} />
           ) : (
-            <Text className="text-2xl font-bold text-blue-100">{guestsCount}</Text>
+            <Text style={{ color: colors.ink }} className="text-2xl font-semibold">
+              {guestsCount}
+            </Text>
           )}
-          <Text className="mt-0.5 text-xs text-blue-300">Guests</Text>
+          <Text
+            style={{ color: colors.inkSubtle }}
+            className="mt-1 text-[11px] uppercase tracking-wider"
+          >
+            Guests
+          </Text>
         </View>
-        <View className="flex-1 rounded-2xl border border-blue-800 bg-blue-900/70 p-4">
-          <Text className="text-2xl font-bold text-blue-100">
+        <View style={{ backgroundColor: colors.hairline }} className="w-px" />
+        <View className="flex-1 p-4">
+          <Text style={{ color: colors.accentWarm }} className="text-2xl font-semibold">
             {SEEDED_POLICY_MATRIX.length}
           </Text>
-          <Text className="mt-0.5 text-xs text-blue-300">Policy Rules</Text>
+          <Text
+            style={{ color: colors.inkSubtle }}
+            className="mt-1 text-[11px] uppercase tracking-wider"
+          >
+            Rules
+          </Text>
         </View>
       </View>
 
-      {/* Navigation Cards */}
-      <View className="mt-6 gap-3">
-        {ITEMS.map((item) => (
-          <Pressable
-            key={item.href}
-            onPress={() => router.push(item.href as Href)}
-            className="flex-row items-center rounded-2xl border-2 border-blue-800 bg-blue-900/50 p-5"
-          >
-            <View className="h-12 w-12 items-center justify-center rounded-xl bg-blue-950">
-              <Ionicons name={item.icon} size={26} color="#bfdbfe" />
-            </View>
-            <View className="ml-4 flex-1">
-              <Text className="text-base font-semibold text-blue-100">{item.title}</Text>
-              <Text className="mt-1 text-xs leading-4 text-blue-300">{item.desc}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#6b8bd6" />
-          </Pressable>
+      {/* Navigation List */}
+      <Text
+        style={{ color: colors.inkSubtle }}
+        className="mb-2.5 mt-7 text-[11px] font-semibold uppercase tracking-[0.16em]"
+      >
+        Administration
+      </Text>
+      <View
+        style={{
+          backgroundColor: colors.surface,
+          borderColor: colors.hairline,
+          borderWidth: 1,
+        }}
+        className="overflow-hidden rounded-2xl"
+      >
+        {ITEMS.map((item, i) => (
+          <View key={item.href}>
+            {i > 0 && <View style={{ backgroundColor: colors.hairline }} className="h-px" />}
+            <Pressable
+              onPress={() => router.push(item.href as Href)}
+              className="flex-row items-center p-4"
+            >
+              <View
+                style={{
+                  backgroundColor: colors.recessed,
+                  borderColor: colors.hairline,
+                  borderWidth: 1,
+                }}
+                className="h-11 w-11 items-center justify-center rounded-xl"
+              >
+                <Ionicons name={item.icon} size={20} color={colors.accentWarm} />
+              </View>
+              <View className="ml-3.5 flex-1">
+                <Text style={{ color: colors.ink }} className="text-sm font-semibold">
+                  {item.title}
+                </Text>
+                <Text style={{ color: colors.inkMuted }} className="mt-0.5 text-xs leading-4">
+                  {item.desc}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.inkSubtle} />
+            </Pressable>
+          </View>
         ))}
       </View>
 
       {/* Owner-only Shared Workspace Action */}
-      <Text className="mb-2 mt-8 text-xs font-semibold uppercase tracking-widest text-blue-400">
-        Owner Shared Space Controls
+      <Text
+        style={{ color: colors.inkSubtle }}
+        className="mb-2.5 mt-7 text-[11px] font-semibold uppercase tracking-[0.16em]"
+      >
+        Shared Space Governance
       </Text>
       <Pressable
         disabled={busy}
         onPress={confirmClearShared}
-        className="flex-row items-center rounded-2xl border border-red-400/50 bg-red-950/30 p-4"
+        style={{
+          backgroundColor: colors.crimsonBg,
+          borderColor: colors.crimsonBorder,
+          borderWidth: 1,
+        }}
+        className="flex-row items-center rounded-2xl p-4"
       >
         {busy ? (
-          <ActivityIndicator size="small" color="#fca5a5" />
+          <ActivityIndicator size="small" color={colors.crimson} />
         ) : (
-          <Ionicons name="trash-outline" size={22} color="#fca5a5" />
+          <Ionicons name="trash-outline" size={20} color={colors.crimson} />
         )}
-        <View className="ml-3 flex-1">
-          <Text className="text-sm font-semibold text-red-200">
+        <View className="ml-3.5 flex-1">
+          <Text style={{ color: colors.crimson }} className="text-sm font-semibold">
             Clear Shared Workspace
           </Text>
-          <Text className="mt-0.5 text-xs text-blue-300">
-            DELETE /api/v1/nas/shared/clear (unconditional ALLOW for OWNER)
+          <Text style={{ color: colors.inkSubtle }} className="mt-0.5 text-[11px]">
+            DELETE /api/v1/nas/shared/clear · Unconditional OWNER rule
           </Text>
         </View>
       </Pressable>

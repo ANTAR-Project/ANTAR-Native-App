@@ -6,7 +6,8 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "antarclientapp",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#090A0D",
     "ios": {
       "icon": "./assets/expo.icon"
     },
@@ -29,7 +30,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#090A0D",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }

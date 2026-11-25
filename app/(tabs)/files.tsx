@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -14,9 +13,12 @@ import {
 import { useRouter, type Href } from "expo-router";
 import { File } from "expo-file-system";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ApiError } from "../../src/api/client";
+import KeyboardModal from "../../src/components/KeyboardModal";
 import ToastBanner from "../../src/components/ToastBanner";
 import { useAuth } from "../../src/context/AuthContext";
+import { useTheme } from "../../src/context/ThemeContext";
 import { type NasScope, useNasApi } from "../../src/hooks/useNasApi";
 import { useToast } from "../../src/hooks/useToast";
 import { getRoleCapabilities, isValidRelativePath } from "../../src/policies";
@@ -32,7 +34,9 @@ function sortEntries(entries: FileEntry[]): FileEntry[] {
 
 export default function Files() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { session } = useAuth();
+  const { colors } = useTheme();
   const {
     listFiles,
     createFolder,
@@ -59,6 +63,7 @@ export default function Files() {
 
   const caps = getRoleCapabilities(session?.role ?? "GUEST");
   const currentRelPath = pathSegments.join("/");
+  const fabBottom = Math.max(insets.bottom, 12) + 88;
 
   const loadDirectory = useCallback(
     async (isPull = false) => {
@@ -71,7 +76,12 @@ export default function Files() {
         const res = await listFiles(currentRelPath, scope);
         setEntries(sortEntries(res.entry ?? []));
       } catch (err) {
-        if (err instanceof ApiError && err.status === 404 && scope === "own" && pathSegments.length === 0) {
+        if (
+          err instanceof ApiError &&
+          err.status === 404 &&
+          scope === "own" &&
+          pathSegments.length === 0
+        ) {
           setWorkspaceMissing(true);
           setEntries([]);
         } else {
@@ -102,7 +112,7 @@ export default function Files() {
     setBusyAction("Creating workspace...");
     try {
       await createWorkspace(session.username);
-      show(`Workspace "${session.username}" created.`, "success");
+      show(`Workspace "${session.username}" provisioned.`, "success");
       await loadDirectory(false);
     } catch (err) {
       show(err instanceof Error ? err.message : "Could not create workspace.", "error");
@@ -265,52 +275,67 @@ export default function Files() {
   };
 
   return (
-    <View className="flex-1 bg-blue-950">
-      {/* Scope Switcher: Own Workspace vs Shared Space */}
-      <View className="flex-row items-center gap-2 border-b border-blue-900 px-4 py-2.5">
-        <Pressable
-          onPress={() => switchScope("own")}
-          className={`flex-1 flex-row items-center justify-center rounded-xl py-2 ${
-            scope === "own" ? "bg-blue-200" : "bg-blue-900"
-          }`}
+    <View style={{ backgroundColor: colors.bg }} className="flex-1">
+      {/* Scope Switcher */}
+      <View
+        style={{ borderBottomColor: colors.hairline, borderBottomWidth: 1 }}
+        className="px-4 py-3"
+      >
+        <View
+          style={{
+            backgroundColor: colors.recessed,
+            borderColor: colors.hairline,
+            borderWidth: 1,
+          }}
+          className="flex-row rounded-xl p-1"
         >
-          <Ionicons
-            name="person-circle-outline"
-            size={16}
-            color={scope === "own" ? "#172554" : "#93c5fd"}
-          />
-          <Text
-            className={`ml-1.5 text-xs font-bold ${
-              scope === "own" ? "text-blue-950" : "text-blue-200"
-            }`}
+          <Pressable
+            onPress={() => switchScope("own")}
+            style={{
+              backgroundColor: scope === "own" ? colors.elevated : "transparent",
+            }}
+            className="flex-1 flex-row items-center justify-center rounded-lg py-2"
           >
-            My Workspace
-          </Text>
-        </Pressable>
+            <Ionicons
+              name="person-outline"
+              size={14}
+              color={scope === "own" ? colors.accent : colors.inkSubtle}
+            />
+            <Text
+              style={{ color: scope === "own" ? colors.ink : colors.inkSubtle }}
+              className="ml-1.5 text-xs font-semibold"
+            >
+              My Workspace
+            </Text>
+          </Pressable>
 
-        <Pressable
-          onPress={() => switchScope("shared")}
-          className={`flex-1 flex-row items-center justify-center rounded-xl py-2 ${
-            scope === "shared" ? "bg-blue-200" : "bg-blue-900"
-          }`}
-        >
-          <Ionicons
-            name="people-outline"
-            size={16}
-            color={scope === "shared" ? "#172554" : "#93c5fd"}
-          />
-          <Text
-            className={`ml-1.5 text-xs font-bold ${
-              scope === "shared" ? "text-blue-950" : "text-blue-200"
-            }`}
+          <Pressable
+            onPress={() => switchScope("shared")}
+            style={{
+              backgroundColor: scope === "shared" ? colors.elevated : "transparent",
+            }}
+            className="flex-1 flex-row items-center justify-center rounded-lg py-2"
           >
-            Shared Space
-          </Text>
-        </Pressable>
+            <Ionicons
+              name="people-outline"
+              size={14}
+              color={scope === "shared" ? colors.accent : colors.inkSubtle}
+            />
+            <Text
+              style={{ color: scope === "shared" ? colors.ink : colors.inkSubtle }}
+              className="ml-1.5 text-xs font-semibold"
+            >
+              Shared Space
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       {/* Breadcrumb + Toolbar */}
-      <View className="flex-row items-center border-b border-blue-900 px-4">
+      <View
+        style={{ borderBottomColor: colors.hairline, borderBottomWidth: 1 }}
+        className="flex-row items-center px-4"
+      >
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -323,10 +348,10 @@ export default function Files() {
           >
             <Ionicons
               name={scope === "shared" ? "globe-outline" : "home-outline"}
-              size={15}
-              color="#bfdbfe"
+              size={14}
+              color={colors.accentWarm}
             />
-            <Text className="ml-1 text-xs font-semibold text-blue-200">
+            <Text style={{ color: colors.ink }} className="ml-1.5 text-xs font-semibold">
               {scope === "shared" ? "shared" : session?.username ?? "home"}
             </Text>
           </Pressable>
@@ -337,8 +362,10 @@ export default function Files() {
               onPress={() => setPathSegments(pathSegments.slice(0, i + 1))}
               className="flex-row items-center py-3"
             >
-              <Ionicons name="chevron-forward" size={14} color="#6b8bd6" />
-              <Text className="text-xs font-semibold text-blue-200">{seg}</Text>
+              <Ionicons name="chevron-forward" size={13} color={colors.inkSubtle} />
+              <Text style={{ color: colors.inkMuted }} className="text-xs font-medium">
+                {seg}
+              </Text>
             </Pressable>
           ))}
         </ScrollView>
@@ -348,27 +375,48 @@ export default function Files() {
             <Pressable
               onPress={confirmClearShared}
               hitSlop={8}
-              className="rounded-lg border border-red-400/50 px-2.5 py-1.5"
+              style={{
+                backgroundColor: colors.crimsonBg,
+                borderColor: colors.crimsonBorder,
+                borderWidth: 1,
+              }}
+              className="rounded-lg px-2.5 py-1.5"
             >
-              <Text className="text-[11px] font-semibold text-red-300">Clear</Text>
+              <Text style={{ color: colors.crimson }} className="text-[11px] font-semibold">
+                Clear
+              </Text>
             </Pressable>
           )}
           <Pressable
             onPress={() => setMkdirModalOpen(true)}
             hitSlop={8}
-            className="flex-row items-center rounded-lg bg-blue-900 px-2.5 py-1.5"
+            style={{
+              backgroundColor: colors.surface,
+              borderColor: colors.hairlineStrong,
+              borderWidth: 1,
+            }}
+            className="flex-row items-center rounded-lg px-2.5 py-1.5"
           >
-            <Ionicons name="folder-open-outline" size={14} color="#bfdbfe" />
-            <Text className="ml-1 text-[11px] font-semibold text-blue-200">+ Folder</Text>
+            <Ionicons name="add" size={14} color={colors.accentWarm} />
+            <Text style={{ color: colors.ink }} className="ml-1 text-[11px] font-semibold">
+              Folder
+            </Text>
           </Pressable>
         </View>
       </View>
 
       {scope === "shared" && (
-        <View className="border-b border-blue-900/60 bg-blue-900/40 px-4 py-2">
-          <Text className="text-[11px] text-blue-300">
-            Policy: Shared space allows LIST/READ for all roles; writes/deletes require
-            SELF ownership ({session?.role === "OWNER" ? "Owner can clear all" : "read-only by default"}).
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderBottomColor: colors.hairline,
+            borderBottomWidth: 1,
+          }}
+          className="px-4 py-2"
+        >
+          <Text style={{ color: colors.inkMuted }} className="text-[11px]">
+            Shared policy: LIST & READ enabled · Writes require SELF ownership
+            {session?.role === "OWNER" ? " · Owner may clear all" : ""}.
           </Text>
         </View>
       )}
@@ -376,9 +424,16 @@ export default function Files() {
       <ToastBanner toast={toast} onDismiss={hide} />
 
       {busyAction && (
-        <View className="mx-4 mt-3 flex-row items-center rounded-xl bg-blue-900 px-4 py-2.5">
-          <ActivityIndicator size="small" color="#bfdbfe" />
-          <Text className="ml-2.5 text-xs font-medium text-blue-100">
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderColor: colors.hairlineStrong,
+            borderWidth: 1,
+          }}
+          className="mx-4 mt-3 flex-row items-center rounded-xl px-4 py-2.5"
+        >
+          <ActivityIndicator size="small" color={colors.accent} />
+          <Text style={{ color: colors.ink }} className="ml-2.5 text-xs font-medium">
             {busyAction}
             {uploadPct !== null ? ` (${uploadPct}%)` : ""}
           </Text>
@@ -387,53 +442,96 @@ export default function Files() {
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#bfdbfe" />
-          <Text className="mt-3 text-sm text-blue-300">Loading directory...</Text>
+          <ActivityIndicator size="small" color={colors.accent} />
+          <Text
+            style={{ color: colors.inkSubtle }}
+            className="mt-3 text-xs uppercase tracking-wider"
+          >
+            Loading directory
+          </Text>
         </View>
       ) : workspaceMissing ? (
-        <View className="flex-1 items-center justify-center px-6">
-          <Ionicons name="server-outline" size={52} color="#60a5fa" />
-          <Text className="mt-4 text-center text-lg font-bold text-blue-100">
+        <View className="flex-1 items-center justify-center px-8 pb-24">
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderColor: colors.hairlineStrong,
+              borderWidth: 1,
+            }}
+            className="h-14 w-14 items-center justify-center rounded-2xl"
+          >
+            <Ionicons name="server-outline" size={26} color={colors.accentWarm} />
+          </View>
+          <Text
+            style={{ color: colors.ink }}
+            className="mt-4 text-center text-base font-semibold"
+          >
             Workspace Not Provisioned
           </Text>
-          <Text className="mt-2 text-center text-sm text-blue-300">
-            No NAS workspace directory exists yet for &quot;{session?.username}&quot;.
+          <Text
+            style={{ color: colors.inkMuted }}
+            className="mt-1.5 text-center text-xs leading-5"
+          >
+            No NAS directory exists yet for &quot;{session?.username}&quot;.
           </Text>
           <Pressable
             onPress={handleProvisionOwnWorkspace}
-            className="mt-6 rounded-2xl bg-blue-200 px-6 py-3.5"
+            style={{ backgroundColor: colors.accent }}
+            className="mt-6 rounded-2xl px-6 py-3.5"
           >
-            <Text className="font-bold text-blue-950">Create My Workspace</Text>
+            <Text
+              style={{ color: colors.accentInk }}
+              className="text-xs font-bold tracking-wide"
+            >
+              Provision My Workspace
+            </Text>
           </Pressable>
         </View>
       ) : errorMsg ? (
-        <View className="flex-1 items-center justify-center px-6">
-          <Ionicons name="alert-circle-outline" size={48} color="#f87171" />
-          <Text className="mt-3 text-center text-sm text-red-200">{errorMsg}</Text>
+        <View className="flex-1 items-center justify-center px-8 pb-24">
+          <Ionicons name="alert-circle-outline" size={38} color={colors.crimson} />
+          <Text
+            style={{ color: colors.crimson }}
+            className="mt-3 text-center text-xs leading-5"
+          >
+            {errorMsg}
+          </Text>
           <Pressable
             onPress={() => void loadDirectory(false)}
-            className="mt-5 rounded-xl bg-blue-800 px-5 py-2.5"
+            style={{
+              backgroundColor: colors.surface,
+              borderColor: colors.hairlineStrong,
+              borderWidth: 1,
+            }}
+            className="mt-5 rounded-xl px-5 py-2.5"
           >
-            <Text className="font-semibold text-blue-100">Retry</Text>
+            <Text style={{ color: colors.ink }} className="text-xs font-semibold">
+              Retry
+            </Text>
           </Pressable>
         </View>
       ) : (
         <FlatList
           data={entries}
           keyExtractor={(e) => e.name}
-          contentContainerClassName="p-4 pb-28"
+          contentContainerStyle={{ padding: 16, paddingBottom: fabBottom + 76 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => void loadDirectory(true)}
-              tintColor="#bfdbfe"
+              tintColor={colors.accent}
             />
           }
-          ItemSeparatorComponent={() => <View className="h-2.5" />}
+          ItemSeparatorComponent={() => <View className="h-2" />}
           ListEmptyComponent={
-            <View className="items-center pt-20">
-              <Ionicons name="folder-open-outline" size={48} color="#3b5bb5" />
-              <Text className="mt-3 text-base text-blue-400">This folder is empty</Text>
+            <View className="items-center pt-24">
+              <Ionicons name="folder-open-outline" size={40} color={colors.inkSubtle} />
+              <Text
+                style={{ color: colors.inkSubtle }}
+                className="mt-3 text-xs tracking-wide"
+              >
+                This folder is empty
+              </Text>
             </View>
           }
           renderItem={({ item }) => {
@@ -441,26 +539,48 @@ export default function Files() {
             return (
               <Pressable
                 onPress={() => openEntry(item)}
-                className="flex-row items-center rounded-2xl border border-blue-800/80 bg-blue-900/70 px-4 py-3"
+                style={{
+                  backgroundColor: colors.surface,
+                  borderColor: colors.hairline,
+                  borderWidth: 1,
+                }}
+                className="flex-row items-center rounded-2xl px-4 py-3.5"
               >
-                <Ionicons
-                  name={
-                    item.isDirectory
-                      ? "folder"
-                      : isVideoFile(cleanName)
-                      ? "film-outline"
-                      : isPreviewable(cleanName)
-                      ? "document-text-outline"
-                      : "document-outline"
-                  }
-                  size={26}
-                  color={item.isDirectory ? "#fbbf24" : "#bfdbfe"}
-                />
-                <View className="ml-3 flex-1">
-                  <Text className="text-base font-semibold text-blue-100" numberOfLines={1}>
+                <View
+                  style={{
+                    backgroundColor: colors.recessed,
+                    borderColor: colors.hairline,
+                    borderWidth: 1,
+                  }}
+                  className="h-10 w-10 items-center justify-center rounded-xl"
+                >
+                  <Ionicons
+                    name={
+                      item.isDirectory
+                        ? "folder"
+                        : isVideoFile(cleanName)
+                        ? "film-outline"
+                        : isPreviewable(cleanName)
+                        ? "document-text-outline"
+                        : "document-outline"
+                    }
+                    size={19}
+                    color={item.isDirectory ? colors.accentWarm : colors.inkMuted}
+                  />
+                </View>
+
+                <View className="ml-3.5 flex-1">
+                  <Text
+                    style={{ color: colors.ink }}
+                    className="text-sm font-semibold"
+                    numberOfLines={1}
+                  >
                     {cleanName}
                   </Text>
-                  <Text className="mt-0.5 text-xs text-blue-300">
+                  <Text
+                    style={{ color: colors.inkSubtle }}
+                    className="mt-0.5 text-[11px]"
+                  >
                     {item.isDirectory ? "Folder" : formatSize(item.size)} ·{" "}
                     {formatDate(item.lastModified)}
                   </Text>
@@ -469,14 +589,14 @@ export default function Files() {
                 {!item.isDirectory && (
                   <Pressable
                     hitSlop={10}
-                    className="mr-3"
+                    className="mr-3.5 p-1"
                     onPress={() => void handleDownload(item)}
                   >
-                    <Ionicons name="download-outline" size={21} color="#bfdbfe" />
+                    <Ionicons name="download-outline" size={18} color={colors.inkMuted} />
                   </Pressable>
                 )}
-                <Pressable hitSlop={10} onPress={() => confirmDelete(item)}>
-                  <Ionicons name="trash-outline" size={21} color="#f87171" />
+                <Pressable hitSlop={10} className="p-1" onPress={() => confirmDelete(item)}>
+                  <Ionicons name="trash-outline" size={18} color={colors.crimson} />
                 </Pressable>
               </Pressable>
             );
@@ -484,58 +604,71 @@ export default function Files() {
         />
       )}
 
-      {/* Upload FAB */}
+      {/* Upload FAB (lifted above floating glass bar) */}
       {!workspaceMissing && (
         <Pressable
           onPress={() => void handleUpload()}
-          className="absolute bottom-6 right-6 h-14 w-14 items-center justify-center rounded-full bg-blue-200 shadow-lg"
+          style={{
+            bottom: fabBottom,
+            backgroundColor: colors.accent,
+          }}
+          className="absolute right-5 h-14 w-14 items-center justify-center rounded-full shadow-lg"
         >
-          <Ionicons name="cloud-upload-outline" size={26} color="#172554" />
+          <Ionicons name="cloud-upload-outline" size={23} color={colors.accentInk} />
         </Pressable>
       )}
 
       {/* New Folder Modal */}
-      <Modal
+      <KeyboardModal
         visible={mkdirModalOpen}
-        transparent
-        animationType="fade"
+        variant="center"
         onRequestClose={() => setMkdirModalOpen(false)}
       >
-        <View className="flex-1 items-center justify-center bg-black/70 px-6">
-          <View className="w-full max-w-md rounded-3xl border border-blue-700 bg-blue-900 p-6">
-            <Text className="text-lg font-bold text-blue-100">Create Folder</Text>
-            <Text className="mt-1 text-xs text-blue-300">
-              Inside {scope === "shared" ? "shared" : session?.username}
-              {currentRelPath ? `/${currentRelPath}` : ""}
+        <Text style={{ color: colors.ink }} className="text-base font-semibold">
+          New Folder
+        </Text>
+        <Text style={{ color: colors.inkMuted }} className="mt-1 text-xs">
+          Inside {scope === "shared" ? "shared" : session?.username}
+          {currentRelPath ? `/${currentRelPath}` : ""}
+        </Text>
+
+        <TextInput
+          value={folderName}
+          onChangeText={setFolderName}
+          placeholder="e.g. documents"
+          placeholderTextColor={colors.inkSubtle}
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={{
+            backgroundColor: colors.recessed,
+            borderColor: colors.hairlineStrong,
+            borderWidth: 1,
+            color: colors.ink,
+          }}
+          className="mt-4 rounded-xl px-4 py-3 text-sm"
+        />
+
+        <View className="mt-5 flex-row gap-3">
+          <Pressable
+            onPress={() => setMkdirModalOpen(false)}
+            style={{ borderColor: colors.hairlineStrong, borderWidth: 1 }}
+            className="flex-1 items-center rounded-xl py-3"
+          >
+            <Text style={{ color: colors.inkMuted }} className="text-xs font-semibold">
+              Cancel
             </Text>
-
-            <TextInput
-              value={folderName}
-              onChangeText={setFolderName}
-              placeholder="e.g. documents"
-              placeholderTextColor="#6b8bd6"
-              autoCapitalize="none"
-              autoCorrect={false}
-              className="mt-4 rounded-xl bg-blue-950 px-4 py-3 text-base text-blue-100"
-            />
-
-            <View className="mt-5 flex-row gap-3">
-              <Pressable
-                onPress={() => setMkdirModalOpen(false)}
-                className="flex-1 items-center rounded-xl border border-blue-700 py-3"
-              >
-                <Text className="font-semibold text-blue-200">Cancel</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => void handleCreateFolder()}
-                className="flex-1 items-center rounded-xl bg-blue-200 py-3"
-              >
-                <Text className="font-bold text-blue-950">Create</Text>
-              </Pressable>
-            </View>
-          </View>
+          </Pressable>
+          <Pressable
+            onPress={() => void handleCreateFolder()}
+            style={{ backgroundColor: colors.accent }}
+            className="flex-1 items-center rounded-xl py-3"
+          >
+            <Text style={{ color: colors.accentInk }} className="text-xs font-bold">
+              Create
+            </Text>
+          </Pressable>
         </View>
-      </Modal>
+      </KeyboardModal>
     </View>
   );
 }

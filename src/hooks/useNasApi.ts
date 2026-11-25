@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { Directory, File, Paths, UploadType } from "expo-file-system";
 import { gatewayFetch, gatewayJson, parseErrorResponse } from "../api/client";
-import { getGatewayUrl } from "../config";
+import { getGatewayUrl, isIgnoredNasEntry } from "../config";
 import { useAuth } from "../context/AuthContext";
 import type {
   CreateFolderResponse,
@@ -29,11 +29,15 @@ export function useNasApi() {
     async (path: string = "", scope: NasScope = "own"): Promise<FileListResponse> => {
       const token = await authHeaders();
       const qs = path ? `?path=${encodeURIComponent(path)}` : "";
-      return gatewayJson<FileListResponse>(`${baseNasPrefix(scope)}/list${qs}`, {
+      const res = await gatewayJson<FileListResponse>(`${baseNasPrefix(scope)}/list${qs}`, {
         method: "GET",
         token,
         onUnauthorizedRefresh: refreshSession,
       });
+      return {
+        ...res,
+        entry: (res.entry ?? []).filter((e) => !isIgnoredNasEntry(e.name)),
+      };
     },
     [authHeaders, refreshSession]
   );
