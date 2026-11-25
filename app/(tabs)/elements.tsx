@@ -13,6 +13,7 @@ import * as SecureStore from "expo-secure-store";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ApiError } from "../../src/api/client";
+import CameraConsole from "../../src/components/CameraConsole";
 import ToastBanner from "../../src/components/ToastBanner";
 import { useAuth } from "../../src/context/AuthContext";
 import { useTheme } from "../../src/context/ThemeContext";
@@ -69,6 +70,7 @@ export default function Elements() {
   const { readElement, controlElement } = useElementsApi();
   const { toast, show, hide } = useToast();
 
+  const [section, setSection] = useState<"elements" | "cameras">("elements");
   const [elementIds, setElementIds] = useState<string[]>(DEFAULT_ELEMENT_IDS);
   const [newId, setNewId] = useState("");
   const [states, setStates] = useState<Record<string, ElementCardState>>({});
@@ -171,6 +173,51 @@ export default function Elements() {
       >
         <ToastBanner toast={toast} onDismiss={hide} />
 
+        {/* Section Switcher: Elements | Cameras */}
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderColor: colors.hairline,
+            borderWidth: 1,
+          }}
+          className="mt-1 flex-row rounded-2xl p-1"
+        >
+          {(
+            [
+              { key: "elements", label: "Elements", icon: "hardware-chip-outline" },
+              { key: "cameras", label: "Cameras & Live", icon: "videocam-outline" },
+            ] as const
+          ).map((tab) => {
+            const active = section === tab.key;
+            return (
+              <Pressable
+                key={tab.key}
+                onPress={() => setSection(tab.key)}
+                style={{
+                  backgroundColor: active ? colors.accent : "transparent",
+                }}
+                className="flex-1 flex-row items-center justify-center rounded-xl py-2"
+              >
+                <Ionicons
+                  name={tab.icon}
+                  size={14}
+                  color={active ? colors.accentInk : colors.inkMuted}
+                />
+                <Text
+                  style={{ color: active ? colors.accentInk : colors.inkMuted }}
+                  className="ml-1.5 text-xs font-bold"
+                >
+                  {tab.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {section === "cameras" ? (
+          <CameraConsole onToast={show} />
+        ) : (
+          <>
         {/* Policy Context Card */}
         <View
           style={{
@@ -403,6 +450,8 @@ export default function Elements() {
             );
           })}
         </View>
+          </>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
