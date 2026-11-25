@@ -25,9 +25,9 @@ export default function VideoStage({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const sub = player.addListener("statusChange", ({ status, error }) => {
-      setStatus(status);
-      setError(status === "error" ? error?.message ?? "Playback failed" : null);
+    const sub = player.addListener("statusChange", ({ status: nextStatus, error: err }) => {
+      setStatus(nextStatus);
+      setError(nextStatus === "error" ? err?.message ?? "Playback failed" : null);
     });
     return () => sub.remove();
   }, [player]);
@@ -42,7 +42,7 @@ export default function VideoStage({
         allowsPictureInPicture
       />
       {status === "loading" && (
-        <View className="absolute inset-0 items-center justify-center">
+        <View className="pointer-events-none absolute inset-0 items-center justify-center">
           <ActivityIndicator color="#bfdbfe" />
         </View>
       )}

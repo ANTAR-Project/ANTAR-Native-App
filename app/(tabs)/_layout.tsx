@@ -1,7 +1,8 @@
-import { Pressable } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../src/context/AuthContext";
+import { roleBadgeLabel } from "../../src/utils";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -14,25 +15,44 @@ const TABS: { name: string; title: string; icon: IconName }[] = [
 ];
 
 export default function TabsLayout() {
-  const { session, logout } = useAuth();
+  const { session, booting, logout } = useAuth();
 
+  if (booting) return null;
   if (!session) return <Redirect href="/" />;
 
-  const isOwner = session.role === "owner";
+  const isOwner = session.role === "OWNER";
+
+  const confirmLogout = () => {
+    Alert.alert(
+      "Sign out?",
+      `Revoke session for ${session.username} (${roleBadgeLabel(session.role)})?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Sign out", style: "destructive", onPress: () => void logout() },
+      ]
+    );
+  };
 
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: "#1e3a8a" },
+        headerStyle: { backgroundColor: "#172554" },
         headerTintColor: "#bfdbfe",
         headerTitleStyle: { fontWeight: "700" },
-        tabBarStyle: { backgroundColor: "#1e3a8a", borderTopColor: "#1d4ed8" },
+        tabBarStyle: { backgroundColor: "#172554", borderTopColor: "#1e3a8a" },
         tabBarActiveTintColor: "#bfdbfe",
         tabBarInactiveTintColor: "#6b8bd6",
         headerRight: () => (
-          <Pressable onPress={logout} hitSlop={12} className="mr-4">
-            <Ionicons name="log-out-outline" size={24} color="#bfdbfe" />
-          </Pressable>
+          <View className="mr-4 flex-row items-center gap-3">
+            <View className="rounded-full border border-blue-700 bg-blue-900 px-2.5 py-1">
+              <Text className="text-[11px] font-semibold text-blue-200">
+                {session.username} · {session.role}
+              </Text>
+            </View>
+            <Pressable onPress={confirmLogout} hitSlop={12}>
+              <Ionicons name="log-out-outline" size={22} color="#bfdbfe" />
+            </Pressable>
+          </View>
         ),
       }}
     >
@@ -42,10 +62,10 @@ export default function TabsLayout() {
           name={t.name}
           options={{
             title: t.title,
-            // Hide the Owner tab for residents
+            // Only OWNER sees the Owner tab (enforced by AuthController + policy-registry)
             href: t.name === "panel" && !isOwner ? null : undefined,
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name={t.icon} size={size} color={color as any} />
+              <Ionicons name={t.icon} size={size} color={color as string} />
             ),
           }}
         />
