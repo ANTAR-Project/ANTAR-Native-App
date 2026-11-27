@@ -1,132 +1,554 @@
-import { useState } from "react";
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ApiError, testGatewayConnection } from "../../src/api/client";
+import ToastBanner from "../../src/components/ToastBanner";
 import { useAuth } from "../../src/context/AuthContext";
+import { useTheme } from "../../src/context/ThemeContext";
+import { useNasApi } from "../../src/hooks/useNasApi";
+import { useToast } from "../../src/hooks/useToast";
+import { getRoleCapabilities } from "../../src/policies";
+import { formatDateTime, formatSize } from "../../src/utils";
 
-type WsState = "active" | "empty" | "deleted";
-
-const TOTAL_GB = 10;
-const USED_GB = 2.4;
+type WsStatus = "loading" | "active" | "missing" | "error";
 
 export default function Workspace() {
-  const { session, clearVault } = useAuth();
-  const [state, setState] = useState<WsState>("active");
+  const insets = useSafeAreaInsets();
+  const {
+    session,
+    gatewayUrl,
+    updateGatewayUrl,
+    clearVault,
+    refreshSession,
+    logout,
+  } = useAuth();
+  const { colors } = useTheme();
+  const { listFiles, createWorkspace, clearOwnWorkspace, deleteOwnWorkspace } = useNasApi();
+  const { toast, show, hide } = useToast();
 
-  const confirm = (title: string, message: string, label: string, action: () => void) =>
+  const [wsStatus, setWsStatus] = useState<WsStatus>("loading");
+  const [itemCount, setItemCount] = useState(0);
+  const [visibleBytes, setVisibleBytes] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const [urlEdit, setUrlEdit] = useState(gatewayUrl);
+  const [connInfo, setConnInfo] = useState<string | null>(null);
+
+  useEffect(() => {
+    setUrlEdit(gatewayUrl);
+  }, [gatewayUrl]);
+
+  const caps = getRoleCapabilities(session?.role ?? "GUEST");
+  const bottomPad = Math.max(insets.bottom, 12) + 100;
+
+  const loadWorkspaceStatus = useCallback(
+    async (isPull = false) => {
+      if (isPull) setRefreshing(true);
+      else setWsStatus("loading");
+      try {
+        const res = await listFiles("", "own");
+        const list = res.entry ?? [];
+        setItemCount(list.length);
+        setVisibleBytes(
+          list.reduce((acc, e) => acc + (e.isDirectory ? 0 : e.size), 0)
+        );
+        setWsStatus("active");
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) {
+          setItemCount(0);
+          setVisibleBytes(0);
+          setWsStatus("missing");
+        } else {
+          setWsStatus("error");
+        }
+      } finally {
+        setRefreshing(false);
+      }
+    },
+    [listFiles]
+  );
+
+  useEffect(() => {
+    void loadWorkspaceStatus(false);
+  }, [loadWorkspaceStatus]);
+
+  const confirm = (
+    title: string,
+    message: string,
+    label: string,
+    action: () => Promise<void>
+  ) =>
     Alert.alert(title, message, [
       { text: "Cancel", style: "cancel" },
-      { text: label, style: "destructive", onPress: action },
+      { text: label, style: "destructive", onPress: () => void action() },
     ]);
 
-  const used = state === "active" ? USED_GB : 0;
-  const pct = Math.round((used / TOTAL_GB) * 100);
+  const handleCreate = async () => {
+    if (!session?.username) return;
+    setBusy("Creating workspace...");
+    try {
+      await createWorkspace(session.username);
+      show(`Workspace "${session.username}" created.`, "success");
+      await loadWorkspaceStatus(false);
+    } catch (err) {
+      show(err instanceof Error ? err.message : "Failed to create workspace.", "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleClear = async () => {
+    setBusy("Clearing workspace...");
+    try {
+      await clearOwnWorkspace();
+      show("Workspace contents cleared.", "success");
+      await loadWorkspaceStatus(false);
+    } catch (err) {
+      show(err instanceof Error ? err.message : "Failed to clear workspace.", "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    setBusy("Deleting workspace...");
+    try {
+      await deleteOwnWorkspace();
+      show("Workspace permanently deleted.", "success");
+      await loadWorkspaceStatus(false);
+    } catch (err) {
+      show(err instanceof Error ? err.message : "Failed to delete workspace.", "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleSaveGateway = async () => {
+    const saved = await updateGatewayUrl(urlEdit);
+    setUrlEdit(saved);
+    const res = await testGatewayConnection(saved);
+    setConnInfo(res.detail);
+    show(res.detail, res.ok ? "success" : "error");
+  };
+
+  const handleRotateToken = async () => {
+    setBusy("Rotating token pair...");
+    const next = await refreshSession();
+    setBusy(null);
+    if (next) show("Access & refresh tokens rotated.", "success");
+    else show("Could not refresh session.", "error");
+  };
 
   return (
-    <ScrollView className="flex-1 bg-blue-950" contentContainerClassName="p-4 pb-10">
-      {/* Workspace card */}
-      <View className="rounded-2xl bg-blue-800 p-5">
-        <View className="flex-row items-center">
-          <Ionicons name="server-outline" size={28} color="#bfdbfe" />
-          <View className="ml-3 flex-1">
-            <Text className="text-lg font-bold text-blue-100">
-              {session?.username}'s workspace
-            </Text>
-            <Text className="text-xs uppercase tracking-widest text-blue-400">
-              {state === "deleted" ? "Deleted" : "Active"}
-            </Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      style={{ backgroundColor: colors.bg }}
+      className="flex-1"
+    >
+      <ScrollView
+        style={{ backgroundColor: colors.bg }}
+        className="flex-1"
+        contentContainerStyle={{ padding: 16, paddingBottom: bottomPad }}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void loadWorkspaceStatus(true)}
+            tintColor={colors.accent}
+          />
+        }
+      >
+        <ToastBanner toast={toast} onDismiss={hide} />
+
+        {/* Workspace Appliance Card */}
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderColor: colors.hairline,
+            borderWidth: 1,
+          }}
+          className="mt-1 rounded-2xl p-5"
+        >
+          <View className="flex-row items-center">
+            <View
+              style={{
+                backgroundColor: colors.recessed,
+                borderColor: colors.hairlineStrong,
+                borderWidth: 1,
+              }}
+              className="h-11 w-11 items-center justify-center rounded-xl"
+            >
+              <Ionicons name="hardware-chip-outline" size={22} color={colors.accentWarm} />
+            </View>
+            <View className="ml-3.5 flex-1">
+              <Text style={{ color: colors.ink }} className="text-base font-semibold">
+                {session?.username}&apos;s workspace
+              </Text>
+              <View className="mt-1 flex-row items-center">
+                <View
+                  style={{
+                    backgroundColor:
+                      wsStatus === "active"
+                        ? colors.emerald
+                        : wsStatus === "missing"
+                        ? colors.amber
+                        : colors.inkSubtle,
+                  }}
+                  className="mr-1.5 h-1.5 w-1.5 rounded-full"
+                />
+                <Text
+                  style={{ color: colors.inkMuted }}
+                  className="text-[11px] uppercase tracking-[0.14em]"
+                >
+                  {wsStatus === "loading"
+                    ? "Checking"
+                    : wsStatus === "active"
+                    ? "Active on NAS"
+                    : wsStatus === "missing"
+                    ? "Not Provisioned"
+                    : "Gateway Unreachable"}
+                </Text>
+              </View>
+            </View>
+            <View
+              style={{
+                backgroundColor: colors.recessed,
+                borderColor: colors.hairlineStrong,
+                borderWidth: 1,
+              }}
+              className="rounded-full px-3 py-1"
+            >
+              <Text
+                style={{ color: colors.accentWarm }}
+                className="text-[10px] font-semibold tracking-wider"
+              >
+                {session?.role}
+              </Text>
+            </View>
           </View>
+
+          {wsStatus === "active" && (
+            <View
+              style={{ borderTopColor: colors.hairline, borderTopWidth: 1 }}
+              className="mt-5 flex-row pt-4"
+            >
+              <View className="flex-1">
+                <Text
+                  style={{ color: colors.inkSubtle }}
+                  className="text-[11px] uppercase tracking-wider"
+                >
+                  Root Items
+                </Text>
+                <Text style={{ color: colors.ink }} className="mt-1 text-lg font-semibold">
+                  {itemCount}
+                </Text>
+              </View>
+              <View style={{ backgroundColor: colors.hairline }} className="w-px" />
+              <View className="flex-1 pl-4">
+                <Text
+                  style={{ color: colors.inkSubtle }}
+                  className="text-[11px] uppercase tracking-wider"
+                >
+                  Root Files
+                </Text>
+                <Text style={{ color: colors.ink }} className="mt-1 text-lg font-semibold">
+                  {formatSize(visibleBytes)}
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
 
-        {state !== "deleted" && (
-          <View className="mt-5">
-            <View className="h-2.5 overflow-hidden rounded-full bg-blue-950">
-              <View
-                className="h-full rounded-full bg-blue-200"
-                style={{ width: `${pct}%` }}
-              />
-            </View>
-            <Text className="mt-2 text-sm text-blue-300">
-              {used.toFixed(1)} GB of {TOTAL_GB} GB used
+        {busy && (
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderColor: colors.hairlineStrong,
+              borderWidth: 1,
+            }}
+            className="mt-4 flex-row items-center rounded-xl px-4 py-3"
+          >
+            <ActivityIndicator size="small" color={colors.accent} />
+            <Text style={{ color: colors.ink }} className="ml-2.5 text-xs font-medium">
+              {busy}
             </Text>
           </View>
         )}
-      </View>
 
-      {/* Actions */}
-      {state === "deleted" ? (
-        <View className="mt-6 items-center rounded-2xl border border-blue-700 p-6">
-          <Text className="text-center text-base text-blue-300">
-            Your workspace was deleted. Create a new one to start uploading files again.
-          </Text>
-          <Pressable
-            // TODO: POST /workspace/create
-            onPress={() => setState("empty")}
-            className="mt-5 w-full items-center rounded-2xl bg-blue-200 py-4"
+        {/* Workspace Lifecycle */}
+        {wsStatus === "missing" ? (
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderColor: colors.hairline,
+              borderWidth: 1,
+            }}
+            className="mt-5 items-center rounded-2xl p-6"
           >
-            <Text className="text-lg font-bold text-blue-900">Create workspace</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <View className="mt-6 gap-3">
-          <Pressable
-            disabled={state === "empty"}
-            onPress={() =>
-              confirm(
-                "Clear workspace?",
-                "All files and folders inside will be removed. The workspace itself stays.",
-                "Clear",
-                // TODO: DELETE /workspace/clear
-                () => setState("empty")
-              )
-            }
-            className={`flex-row items-center rounded-2xl border-2 p-4 ${
-              state === "empty" ? "border-blue-800 opacity-50" : "border-blue-500"
-            }`}
-          >
-            <Ionicons name="trash-bin-outline" size={24} color="#bfdbfe" />
-            <View className="ml-3 flex-1">
-              <Text className="text-base font-semibold text-blue-100">Clear workspace</Text>
-              <Text className="text-xs text-blue-300">
-                {state === "empty" ? "Already empty" : "Remove everything inside"}
+            <Text
+              style={{ color: colors.inkMuted }}
+              className="text-center text-xs leading-5"
+            >
+              No workspace directory exists yet on TrueNAS for &quot;{session?.username}&quot;.
+            </Text>
+            <Pressable
+              onPress={() => void handleCreate()}
+              style={{ backgroundColor: colors.accent }}
+              className="mt-4 w-full items-center rounded-2xl py-3.5"
+            >
+              <Text
+                style={{ color: colors.accentInk }}
+                className="text-xs font-bold tracking-wide"
+              >
+                Create Workspace
               </Text>
-            </View>
+            </Pressable>
+            {!caps.canProvisionWorkspaces && (
+              <Text
+                style={{ color: colors.amber }}
+                className="mt-2.5 text-center text-[11px]"
+              >
+                Note: Guest provisioning may require Owner approval per policy.
+              </Text>
+            )}
+          </View>
+        ) : (
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderColor: colors.hairline,
+              borderWidth: 1,
+            }}
+            className="mt-5 overflow-hidden rounded-2xl"
+          >
+            <Pressable
+              disabled={wsStatus !== "active"}
+              onPress={() =>
+                confirm(
+                  "Clear workspace?",
+                  "All files and folders inside your workspace will be removed. The workspace directory itself remains.",
+                  "Clear",
+                  handleClear
+                )
+              }
+              className={`flex-row items-center p-4 ${
+                wsStatus !== "active" ? "opacity-45" : ""
+              }`}
+            >
+              <Ionicons name="trash-bin-outline" size={20} color={colors.inkMuted} />
+              <View className="ml-3.5 flex-1">
+                <Text style={{ color: colors.ink }} className="text-sm font-semibold">
+                  Clear Workspace
+                </Text>
+                <Text style={{ color: colors.inkSubtle }} className="mt-0.5 text-[11px]">
+                  {"Remove all contents inside workspace"}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.inkSubtle} />
+            </Pressable>
+
+            <View style={{ backgroundColor: colors.hairline }} className="h-px" />
+
+            <Pressable
+              disabled={wsStatus !== "active"}
+              onPress={() =>
+                confirm(
+                  "Delete workspace?",
+                  "Your entire workspace directory and all contents will be permanently deleted.",
+                  "Delete",
+                  handleDelete
+                )
+              }
+              className={`flex-row items-center p-4 ${
+                wsStatus !== "active" ? "opacity-45" : ""
+              }`}
+            >
+              <Ionicons name="warning-outline" size={20} color={colors.crimson} />
+              <View className="ml-3.5 flex-1">
+                <Text style={{ color: colors.crimson }} className="text-sm font-semibold">
+                  Delete Workspace
+                </Text>
+                <Text style={{ color: colors.inkSubtle }} className="mt-0.5 text-[11px]">
+                  Permanently remove your NAS workspace directory
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.inkSubtle} />
+            </Pressable>
+          </View>
+        )}
+
+        {/* Session Claims */}
+        <Text
+          style={{ color: colors.inkSubtle }}
+          className="mb-2.5 mt-8 text-[11px] font-semibold uppercase tracking-[0.16em]"
+        >
+          Session Claims
+        </Text>
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderColor: colors.hairline,
+            borderWidth: 1,
+          }}
+          className="gap-2.5 rounded-2xl p-4"
+        >
+          <Row label="Username" value={session?.username ?? "-"} />
+          <Row label="Role" value={session?.role ?? "-"} />
+          <Row label="Session ID" value={session?.sessionId ?? "-"} mono />
+          <Row label="User ID" value={session?.userId ?? "-"} mono />
+          <Row
+            label="Token Expires"
+            value={
+              session?.expiresAtEpochMs
+                ? formatDateTime(session.expiresAtEpochMs)
+                : "-"
+            }
+          />
+        </View>
+
+        {/* API Gateway Endpoint */}
+        <Text
+          style={{ color: colors.inkSubtle }}
+          className="mb-2.5 mt-8 text-[11px] font-semibold uppercase tracking-[0.16em]"
+        >
+          Gateway Endpoint
+        </Text>
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderColor: colors.hairline,
+            borderWidth: 1,
+          }}
+          className="rounded-2xl p-4"
+        >
+          <TextInput
+            value={urlEdit}
+            onChangeText={setUrlEdit}
+            placeholder="http://192.168.0.104:8443"
+            placeholderTextColor={colors.inkSubtle}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={{
+              backgroundColor: colors.recessed,
+              borderColor: colors.hairlineStrong,
+              borderWidth: 1,
+              color: colors.ink,
+            }}
+            className="rounded-xl px-3.5 py-3 font-mono text-xs"
+          />
+          {connInfo && (
+            <Text style={{ color: colors.inkMuted }} className="mt-2 text-xs">
+              {connInfo}
+            </Text>
+          )}
+          <Pressable
+            onPress={() => void handleSaveGateway()}
+            style={{ backgroundColor: colors.accent }}
+            className="mt-3 items-center rounded-xl py-3"
+          >
+            <Text
+              style={{ color: colors.accentInk }}
+              className="text-xs font-bold tracking-wide"
+            >
+              Save & Test Gateway
+            </Text>
           </Pressable>
+        </View>
+
+        {/* Security Actions */}
+        <Text
+          style={{ color: colors.inkSubtle }}
+          className="mb-2.5 mt-8 text-[11px] font-semibold uppercase tracking-[0.16em]"
+        >
+          Security
+        </Text>
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderColor: colors.hairline,
+            borderWidth: 1,
+          }}
+          className="overflow-hidden rounded-2xl"
+        >
+          <Pressable
+            onPress={() => void handleRotateToken()}
+            className="flex-row items-center p-4"
+          >
+            <Ionicons name="refresh-outline" size={20} color={colors.accentWarm} />
+            <Text style={{ color: colors.ink }} className="ml-3.5 flex-1 text-sm font-medium">
+              Rotate Access & Refresh Tokens
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.inkSubtle} />
+          </Pressable>
+
+          <View style={{ backgroundColor: colors.hairline }} className="h-px" />
+
+          <Pressable
+            onPress={async () => {
+              await clearVault();
+              show("Biometric sign-in removed from this device.", "info");
+            }}
+            className="flex-row items-center p-4"
+          >
+            <Ionicons name="finger-print-outline" size={20} color={colors.inkMuted} />
+            <Text style={{ color: colors.ink }} className="ml-3.5 flex-1 text-sm font-medium">
+              Forget Biometrics on Device
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.inkSubtle} />
+          </Pressable>
+
+          <View style={{ backgroundColor: colors.hairline }} className="h-px" />
 
           <Pressable
             onPress={() =>
               confirm(
-                "Delete workspace?",
-                "Your entire workspace and all its contents will be permanently deleted.",
-                "Delete",
-                // TODO: DELETE /workspace/delete
-                () => setState("deleted")
+                "Sign out?",
+                "This revokes your active session on auth-service.",
+                "Sign out",
+                logout
               )
             }
-            className="flex-row items-center rounded-2xl border-2 border-red-400/60 p-4"
+            className="flex-row items-center p-4"
           >
-            <Ionicons name="warning-outline" size={24} color="#f87171" />
-            <View className="ml-3 flex-1">
-              <Text className="text-base font-semibold text-red-300">Delete workspace</Text>
-              <Text className="text-xs text-blue-300">Permanently remove the workspace</Text>
-            </View>
+            <Ionicons name="log-out-outline" size={20} color={colors.crimson} />
+            <Text style={{ color: colors.crimson }} className="ml-3.5 flex-1 text-sm font-semibold">
+              Sign Out
+            </Text>
           </Pressable>
         </View>
-      )}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
 
-      {/* Security */}
-      <Text className="mb-2 mt-10 text-sm font-semibold uppercase tracking-widest text-blue-400">
-        Security
+function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  const { colors } = useTheme();
+  return (
+    <View className="flex-row items-center justify-between gap-4">
+      <Text style={{ color: colors.inkSubtle }} className="text-xs">
+        {label}
       </Text>
-      <Pressable
-        onPress={async () => {
-          await clearVault();
-          Alert.alert("Done", "Fingerprint login was removed from this device.");
-        }}
-        className="flex-row items-center rounded-2xl bg-blue-800 p-4"
+      <Text
+        style={{ color: colors.ink }}
+        className={`flex-1 text-right text-xs ${mono ? "font-mono" : "font-medium"}`}
+        numberOfLines={1}
       >
-        <Ionicons name="finger-print-outline" size={24} color="#bfdbfe" />
-        <Text className="ml-3 text-base text-blue-100">Forget fingerprint on this device</Text>
-      </Pressable>
-    </ScrollView>
+        {value}
+      </Text>
+    </View>
   );
 }
