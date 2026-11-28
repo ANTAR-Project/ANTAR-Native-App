@@ -87,6 +87,19 @@ export interface CreateWorkspaceResponse {
   message: string;
 }
 
+export interface WorkspaceInfoResponse {
+  totalFiles?: number;
+  totalSize?: number;
+  totalBytes?: number;
+  total_files?: number;
+  total_size?: number;
+  total_bytes?: number;
+  fileCount?: number;
+  size?: number;
+  exists?: boolean;
+  [key: string]: unknown;
+}
+
 export interface PlaylistDto {
   path: string;
   thumbnailUrl: string | null;

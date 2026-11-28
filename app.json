@@ -1,29 +1,29 @@
 {
   "expo": {
-    "name": "ANTAR_Client_App",
-    "slug": "ANTAR_Client_App",
+    "name": "ANTAR",
+    "slug": "ANTAR",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "antarclientapp",
+    "icon": "./assets/images/antar-logo.png",
+    "scheme": "antar",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#090A0D",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/antar-logo.png"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/antar-logo.png",
+        "backgroundImage": "./assets/images/antar-logo.png",
+        "monochromeImage": "./assets/images/antar-logo.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.ANTAR_Client_App"
+      "package": "com.antar.ANTAR"
     },
     "web": {
       "output": "server",
-      "favicon": "./assets/images/favicon.png",
+      "favicon": "./assets/images/antar-logo.png",
       "bundler": "metro"
     },
     "plugins": [
@@ -32,13 +32,22 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#090A0D",
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/antar-logo.png",
           "imageWidth": 76
         }
       ],
       "expo-secure-store",
       "expo-web-browser",
-      "expo-video"
+      "expo-video",
+      "@config-plugins/react-native-webrtc",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 24
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

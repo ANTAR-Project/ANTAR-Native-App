@@ -35,12 +35,12 @@ export default function Workspace() {
     logout,
   } = useAuth();
   const { colors } = useTheme();
-  const { listFiles, createWorkspace, clearOwnWorkspace, deleteOwnWorkspace } = useNasApi();
+  const { getWorkspaceInfo, createWorkspace, clearOwnWorkspace, deleteOwnWorkspace } = useNasApi();
   const { toast, show, hide } = useToast();
 
   const [wsStatus, setWsStatus] = useState<WsStatus>("loading");
-  const [itemCount, setItemCount] = useState(0);
-  const [visibleBytes, setVisibleBytes] = useState(0);
+  const [totalFiles, setTotalFiles] = useState(0);
+  const [totalSize, setTotalSize] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -59,17 +59,23 @@ export default function Workspace() {
       if (isPull) setRefreshing(true);
       else setWsStatus("loading");
       try {
-        const res = await listFiles("", "own");
-        const list = res.entry ?? [];
-        setItemCount(list.length);
-        setVisibleBytes(
-          list.reduce((acc, e) => acc + (e.isDirectory ? 0 : e.size), 0)
-        );
+        const res = await getWorkspaceInfo();
+        if (res.exists === false) {
+          setTotalFiles(0);
+          setTotalSize(0);
+          setWsStatus("missing");
+          return;
+        }
+        const files = res.totalFiles ?? res.total_files ?? res.fileCount ?? 0;
+        const bytes =
+          res.totalSize ?? res.total_size ?? res.totalBytes ?? res.total_bytes ?? res.size ?? 0;
+        setTotalFiles(files);
+        setTotalSize(bytes);
         setWsStatus("active");
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {
-          setItemCount(0);
-          setVisibleBytes(0);
+          setTotalFiles(0);
+          setTotalSize(0);
           setWsStatus("missing");
         } else {
           setWsStatus("error");
@@ -78,7 +84,7 @@ export default function Workspace() {
         setRefreshing(false);
       }
     },
-    [listFiles]
+    [getWorkspaceInfo]
   );
 
   useEffect(() => {
@@ -251,10 +257,10 @@ export default function Workspace() {
                   style={{ color: colors.inkSubtle }}
                   className="text-[11px] uppercase tracking-wider"
                 >
-                  Root Items
+                  Total Files
                 </Text>
                 <Text style={{ color: colors.ink }} className="mt-1 text-lg font-semibold">
-                  {itemCount}
+                  {totalFiles}
                 </Text>
               </View>
               <View style={{ backgroundColor: colors.hairline }} className="w-px" />
@@ -263,10 +269,10 @@ export default function Workspace() {
                   style={{ color: colors.inkSubtle }}
                   className="text-[11px] uppercase tracking-wider"
                 >
-                  Root Files
+                  Total Size
                 </Text>
                 <Text style={{ color: colors.ink }} className="mt-1 text-lg font-semibold">
-                  {formatSize(visibleBytes)}
+                  {formatSize(totalSize)}
                 </Text>
               </View>
             </View>

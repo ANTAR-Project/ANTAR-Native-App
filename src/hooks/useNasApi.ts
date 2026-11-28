@@ -8,6 +8,7 @@ import type {
   CreateWorkspaceResponse,
   FileListResponse,
   FileUploadResponse,
+  WorkspaceInfoResponse,
 } from "../types";
 
 export type NasScope = "own" | "shared";
@@ -191,6 +192,15 @@ export function useNasApi() {
     [session?.accessToken]
   );
 
+  const getWorkspaceInfo = useCallback(async (): Promise<WorkspaceInfoResponse> => {
+    const token = await authHeaders();
+    return gatewayJson<WorkspaceInfoResponse>("/api/v1/nas/workspace/info", {
+      method: "GET",
+      token,
+      onUnauthorizedRefresh: refreshSession,
+    });
+  }, [authHeaders, refreshSession]);
+
   const createWorkspace = useCallback(
     async (name: string): Promise<CreateWorkspaceResponse> => {
       const token = await authHeaders();
@@ -232,6 +242,7 @@ export function useNasApi() {
     downloadFileToCache,
     fetchPreviewText,
     buildPreviewUrl,
+    getWorkspaceInfo,
     createWorkspace,
     clearOwnWorkspace,
     deleteOwnWorkspace,
